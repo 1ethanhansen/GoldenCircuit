@@ -163,8 +163,6 @@ def run_subcirc_known_axis(subcirc1, subcirc2, axis, shots=10000):
     alpha = ['X','Y','Z']
     alpha.remove(axis)
 
-    print(alpha)
-
     pA = np.zeros(shape=[2**(nA-1),2,3])
     pB = np.zeros(shape=[2**nB,2,3])
 
@@ -217,15 +215,11 @@ def run_subcirc_known_axis(subcirc1, subcirc2, axis, shots=10000):
             circ = transpile(subcirc2_, simulator)
             result = simulator.run(circ,shots=shots).result()
             counts = result.get_counts(circ)
-            print(counts)
 
             for n in range(2**nB,2**(nB+1)):
                 bstr = bin(n)
                 string = bstr[3:len(bstr)][::-1]
                 str_ind = int(string,2)
-                print(string)
-                print(str_ind)
-                print()
 
                 if string not in counts:
                     pB[str_ind, e, beta] = 0
