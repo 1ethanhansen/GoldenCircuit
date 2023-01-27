@@ -9,6 +9,7 @@ from main import *
 import time
 import random
 import numpy as np
+import scipy.stats as st
 
 
 ''' Create a random circuit where only 1 axis of the bloch
@@ -20,7 +21,7 @@ import numpy as np
 '''
 def gen_random_circuit_specific_rotation(axis, subcirc_size=2):
     # First half of our circuit (qubits 0 and 1)
-    subcirc1 = QuantumCircuit(2)
+    subcirc1 = QuantumCircuit(subcirc_size)
     # Get the random value to rotate
     theta = random.uniform(0, 6.28)
 
@@ -30,8 +31,9 @@ def gen_random_circuit_specific_rotation(axis, subcirc_size=2):
     elif axis == "Y":
         subcirc1.ry(theta, [0])
 
-    subcirc1.h(0)
-    subcirc1.h(1)
+    subcirc1_non_shared = random_circuit(subcirc_size-1, subcirc_size//2)
+
+    subcirc1.compose(subcirc1_non_shared, inplace=True)
         
     # Optionally add entangling gate between qubits 0 and 1
     # before the cut
@@ -46,7 +48,8 @@ def gen_random_circuit_specific_rotation(axis, subcirc_size=2):
     # create the full circuit
     fullcirc = QuantumCircuit(subcirc_size*2 - 1)
     fullcirc.compose(subcirc1, inplace=True)
-    fullcirc.compose(subcirc2, qubits=[1,2], inplace=True)
+    fullcirc.cnot(subcirc_size-1, subcirc_size)
+    fullcirc.compose(subcirc2, qubits=[i for i in range(subcirc_size-1, subcirc_size*2-1)], inplace=True)
     fullcirc.measure_all()
 
     # print(subcirc1)
@@ -94,12 +97,16 @@ def compare_golden_and_standard(trials=1000, max_size=5, shots=10000):
     golden_times = np.zeros([max_size-2, trials])
     standard_times = np.zeros([max_size-2, trials])
 
+    # 2 is the smallest valid subcircuit size, iterate from there
     for subcirc_size in range(2, max_size):
         ic(subcirc_size)
+        # collect multiple trials for each subcircuit size
         for trial in range(trials):
+            # On each trial select a random axis for our rotation before the cut
             axis = random.choice(axes)
             circ,subcirc1,subcirc2 = gen_random_circuit_specific_rotation(axis)
 
+            # time how long it takes to run and reconstruct using the golden method
             start = time.time()
             pA, pB = run_subcirc_known_axis(subcirc1, subcirc2, axis, shots)
             exact = reconstruct_exact(pA,pB,subcirc1.width(),subcirc2.width())
@@ -107,6 +114,7 @@ def compare_golden_and_standard(trials=1000, max_size=5, shots=10000):
             elapsed = end-start
             golden_times[subcirc_size-2][trial] = elapsed
 
+            # time how long it takes to run and reconstruct using the standard method
             start = time.time()
             pA, pB = run_subcirc(subcirc1, subcirc2, shots)
             exact = reconstruct_exact(pA,pB,subcirc1.width(),subcirc2.width())
@@ -115,36 +123,43 @@ def compare_golden_and_standard(trials=1000, max_size=5, shots=10000):
             standard_times[subcirc_size-2][trial] = elapsed
     
     # Now that all the data is in, analyse it
+    # Get mean and standard error for runtime for each size of subcircuit
     golden_means = golden_times.mean(axis=1)
-    golden_stds = np.std(golden_times, axis=1, ddof=1)
-
+    golden_sems = np.std(golden_times, axis=1, ddof=1) / np.sqrt(trials)
+    # repeat for standard method
     standard_means = standard_times.mean(axis=1)
-    standard_stds = np.std(standard_times, axis=1, ddof=1)
+    standard_sems = np.std(standard_times, axis=1, ddof=1) / np.sqrt(trials)
+    # create empty arrays to store our 95% confidence intervals
+    golden_interval = np.zeros([len(golden_means)])
+    standard_interval = np.zeros([len(standard_means)])
 
+    # iterate over all of the subcircuit sizes
     for i in range(len(golden_means)):
-        ic(i)
-        ic(golden_means[i], standard_means[i], golden_stds[i], standard_stds[i])
+        ic(i+2)
+        ic(golden_means[i], standard_means[i], golden_sems[i], standard_sems[i])
 
+        # for both golden and standard methods, find the upper and lower bounds of
+        #   the 95% confidence interval - then find what that is in terms of symmmetric +/-
+        overall_interval = st.t.interval(confidence=0.95, df=trials-1, loc=golden_means[i], scale=golden_sems[i])
+        plus_minus = (overall_interval[1] - overall_interval[0]) / 2
+        golden_interval[i] = plus_minus
+
+        overall_interval = st.t.interval(confidence=0.95, df=trials-1, loc=standard_means[i], scale=standard_sems[i])
+        plus_minus = (overall_interval[1] - overall_interval[0]) / 2
+        standard_interval[i] = plus_minus
+
+    # create array of x-values for plot
     sizes = np.array([i for i in range(2, max_size)])
+    # create the plot
     fig, ax = plt.subplots()
-    ax.errorbar(sizes, golden_means, yerr=golden_stds*2, fmt ='-o', color='#5E81AC', capsize=10, ecolor='#2E3440')
-    ax.errorbar(sizes, standard_means, yerr=standard_stds*2, fmt ='-o', color='#BF616A', capsize=10, ecolor='#2E3440')
+    ax.errorbar(sizes, golden_means, yerr=golden_interval, fmt ='-o', color='#5E81AC', capsize=10, ecolor='#2E3440', label='golden')
+    ax.errorbar(sizes, standard_means, yerr=standard_interval, fmt ='-o', color='#BF616A', capsize=10, ecolor='#2E3440', label='standard')
     ax.set_title('Time vs subcircuit size')
     ax.set_xlabel('Subcircuit size (width)')
     ax.set_ylabel('Time (s)')
     plt.show()
 
-        
-
-
-    
-
-
-
-
-
-
-# gen_random_circuit_specific_rotation("X")
+# gen_random_circuit_specific_rotation("X", 5)
 # one_cut_known_axis()
 
 compare_golden_and_standard()
