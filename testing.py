@@ -59,6 +59,8 @@ def gen_random_circuit_specific_rotation(axis, subcirc_size=2):
 ''' For a given axis (X,Y,Z) create subcircuits and a full circuit
     to compare the reconstruction method with a run of the full
     circuit
+
+    Used to verify correctness of the reconstruction method
 '''
 def one_cut_known_axis(axis="X", shots=10000):
     # Get the random circuit with a specific axis of rotation, then reconstruct
@@ -80,14 +82,17 @@ def one_cut_known_axis(axis="X", shots=10000):
     plt.show()
 
 
-
+''' This function runs both the golden method and the standard method,
+    timing each to determine runtime differences.
+'''
 def compare_golden_and_standard(trials=1000, max_size=5, shots=10000):
+    max_size = max_size+1   # make max_size inclusive
+    # The axes available to us. For info on why "Z" is not an option,
+    #   please see the paper
     axes = ["X", "Y"]
+    # Arrays to store the timing results
     golden_times = np.zeros([max_size-2, trials])
     standard_times = np.zeros([max_size-2, trials])
-
-    sum_golden = 0
-    sum_standard = 0
 
     for subcirc_size in range(2, max_size):
         ic(subcirc_size)
@@ -97,20 +102,40 @@ def compare_golden_and_standard(trials=1000, max_size=5, shots=10000):
 
             start = time.time()
             pA, pB = run_subcirc_known_axis(subcirc1, subcirc2, axis, shots)
+            exact = reconstruct_exact(pA,pB,subcirc1.width(),subcirc2.width())
             end = time.time()
             elapsed = end-start
             golden_times[subcirc_size-2][trial] = elapsed
-            sum_golden += elapsed
 
             start = time.time()
             pA, pB = run_subcirc(subcirc1, subcirc2, shots)
+            exact = reconstruct_exact(pA,pB,subcirc1.width(),subcirc2.width())
             end = time.time()
             elapsed = end-start
             standard_times[subcirc_size-2][trial] = elapsed
-            sum_standard += elapsed
+    
+    # Now that all the data is in, analyse it
+    golden_means = golden_times.mean(axis=1)
+    golden_stds = np.std(golden_times, axis=1, ddof=1)
 
-    ic(sum_golden)
-    ic(sum_standard)
+    standard_means = standard_times.mean(axis=1)
+    standard_stds = np.std(standard_times, axis=1, ddof=1)
+
+    for i in range(len(golden_means)):
+        ic(i)
+        ic(golden_means[i], standard_means[i], golden_stds[i], standard_stds[i])
+
+    sizes = np.array([i for i in range(2, max_size)])
+    fig, ax = plt.subplots()
+    ax.errorbar(sizes, golden_means, yerr=golden_stds*2, fmt ='-o', color='#5E81AC', capsize=10, ecolor='#2E3440')
+    ax.errorbar(sizes, standard_means, yerr=standard_stds*2, fmt ='-o', color='#BF616A', capsize=10, ecolor='#2E3440')
+    ax.set_title('Time vs subcircuit size')
+    ax.set_xlabel('Subcircuit size (width)')
+    ax.set_ylabel('Time (s)')
+    plt.show()
+
+        
+
 
     
 
@@ -122,4 +147,5 @@ def compare_golden_and_standard(trials=1000, max_size=5, shots=10000):
 # gen_random_circuit_specific_rotation("X")
 # one_cut_known_axis()
 
-compare_golden_and_standard(trials=100, max_size=5, shots=1000)
+compare_golden_and_standard()
+# compare_golden_and_standard(trials=100, max_size=3, shots=10)
