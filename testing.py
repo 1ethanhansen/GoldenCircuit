@@ -152,8 +152,8 @@ def compare_golden_and_standard(trials=1000, max_size=5, shots=10000):
     sizes = np.array([i for i in range(2, max_size)])
     # create the plot
     fig, ax = plt.subplots()
-    ax.errorbar(sizes, golden_means, yerr=golden_interval, fmt ='-o', color='#5E81AC', capsize=10, ecolor='#2E3440', label='golden')
-    ax.errorbar(sizes, standard_means, yerr=standard_interval, fmt ='-o', color='#BF616A', capsize=10, ecolor='#2E3440', label='standard')
+    ax.errorbar(sizes, golden_means, yerr=golden_interval, fmt ='-o', color='#FFD700', capsize=5, ecolor='#2E3440', label='golden')
+    ax.errorbar(sizes, standard_means, yerr=standard_interval, fmt ='-o', color='#BF616A', capsize=5, ecolor='#2E3440', label='standard')
     ax.set_title('Time vs subcircuit size')
     ax.set_xlabel('Subcircuit size (width)')
     ax.set_ylabel('Time (s)')

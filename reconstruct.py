@@ -15,7 +15,7 @@ def gamma(beta,ahat,e):
 
 
 # run sub-circuits and return two rank-3 tensors
-def run_subcirc(subcirc1, subcirc2,shot=10000):
+def run_subcirc(subcirc1, subcirc2,shots=10000):
     nA = subcirc1.width()
     nB = subcirc2.width()
 
@@ -37,7 +37,7 @@ def run_subcirc(subcirc1, subcirc2,shot=10000):
 
         simulator = Aer.get_backend('aer_simulator')
         circ = transpile(subcirc1_, simulator)
-        result = simulator.run(circ,shots=shot).result()
+        result = simulator.run(circ,shots=shots).result()
         counts = result.get_counts(circ)
 
         for n in range(2**nA,2**(nA+1)):
@@ -50,7 +50,7 @@ def run_subcirc(subcirc1, subcirc2,shot=10000):
             if string not in counts:
                 pA[str_ind, ahat, beta] = 0
             else:
-                pA[str_ind, ahat, beta] = counts[string]/shot
+                pA[str_ind, ahat, beta] = counts[string]/shots
 
     for x in alpha:
         for e in [0, 1]:
@@ -69,7 +69,7 @@ def run_subcirc(subcirc1, subcirc2,shot=10000):
             subcirc2_.measure_all()
 
             circ = transpile(subcirc2_, simulator)
-            result = simulator.run(circ,shot=shot).result()
+            result = simulator.run(circ,shots=shots).result()
             counts = result.get_counts(circ)
 
             for n in range(2**nB,2**(nB+1)):
@@ -80,7 +80,7 @@ def run_subcirc(subcirc1, subcirc2,shot=10000):
                 if string not in counts:
                     pB[str_ind, e, beta] = 0
                 else:
-                    pB[str_ind, e, beta] = counts[string]/shot
+                    pB[str_ind, e, beta] = counts[string]/shots
     return pA, pB
 
 
