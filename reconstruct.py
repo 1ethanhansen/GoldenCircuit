@@ -117,8 +117,9 @@ def run_subcirc_known_axis(subcirc1, subcirc2, axis, device, shots=10000):
 
         circ = transpile(subcirc1_, device)
         job = device.run(circ,shots=shots)
-        ic("pA job", job.job_id())
+        ic("pA", job.job_id())
         counts = job.result().get_counts(circ)
+        ic("pA", job.time_per_step())
 
         for n in range(2**nA,2**(nA+1)):
             # ss = subcirc1.width()
@@ -150,8 +151,9 @@ def run_subcirc_known_axis(subcirc1, subcirc2, axis, device, shots=10000):
 
             circ = transpile(subcirc2_, device)
             job = device.run(circ,shots=shots)
-            ic("pB job", job.job_id())
+            ic("pB", job.job_id())
             counts = job.result().get_counts(circ)
+            ic("pB", job.time_per_step())
 
             for n in range(2**nB,2**(nB+1)):
                 bstr = bin(n)

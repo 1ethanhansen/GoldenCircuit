@@ -94,6 +94,12 @@ def one_cut_known_axis(axis="X", shots=20000, run_on_real_device=False):
     job = device.run(circ_, shots=shots)
     ic("full circuit", job.job_id())
     counts = job.result().get_counts()
+
+    # code for getting the time it took to run the circuit (potentially useful later)
+    time_per_step = job.time_per_step()
+    delta_seconds = (time_per_step['COMPLETED'] - time_per_step['RUNNING']).total_seconds()
+    ic("full circuit", delta_seconds)
+
     # print two different methods of determining the distance between bitstring distributions
     ic(totalVariationalDistance(reconstructed, counts))
     ic(weighted_distance(reconstructed, counts))
@@ -110,6 +116,7 @@ def one_cut_known_axis(axis="X", shots=20000, run_on_real_device=False):
 '''
 def compare_golden_and_standard(trials=1000, max_size=5, shots=10000):
     max_size = max_size+1   # make max_size inclusive
+    device = Aer.get_backend('aer_simulator')   # create simulator device
     # The axes available to us. For info on why "Z" is not an option,
     #   please see the paper
     axes = ["X", "Y"]
@@ -128,7 +135,7 @@ def compare_golden_and_standard(trials=1000, max_size=5, shots=10000):
 
             # time how long it takes to run and reconstruct using the golden method
             start = time.time()
-            pA, pB = run_subcirc_known_axis(subcirc1, subcirc2, axis, shots)
+            pA, pB = run_subcirc_known_axis(subcirc1, subcirc2, axis, device, shots)
             exact = reconstruct_exact(pA,pB,subcirc1.width(),subcirc2.width())
             end = time.time()
             elapsed = end-start
@@ -189,7 +196,7 @@ def get_least_busy_real_device():
 
 
 # gen_random_circuit_specific_rotation("X", 5)
-one_cut_known_axis(axis='X', shots=1000, run_on_real_device=False)
+one_cut_known_axis(axis='X', shots=20000, run_on_real_device=True)
 
 # compare_golden_and_standard()
 # compare_golden_and_standard(trials=100, max_size=3, shots=10)
