@@ -5,6 +5,8 @@ from distances import *
 from qiskit.circuit.random import random_circuit
 from qiskit.visualization import plot_histogram
 from qiskit import QuantumCircuit, Aer, transpile
+from qiskit import IBMQ
+from qiskit.providers.ibmq import least_busy
 from icecream import ic
 from main import *
 import time
@@ -49,7 +51,6 @@ def gen_random_circuit_specific_rotation(axis, subcirc_size=2):
     # create the full circuit
     fullcirc = QuantumCircuit(subcirc_size*2 - 1)
     fullcirc.compose(subcirc1, inplace=True)
-    fullcirc.barrier()
     fullcirc.compose(subcirc2, qubits=[i for i in range(subcirc_size-1, subcirc_size*2-1)], inplace=True)
     fullcirc.measure_all()
 
@@ -66,17 +67,25 @@ def gen_random_circuit_specific_rotation(axis, subcirc_size=2):
 
     Used to verify correctness of the reconstruction method
 '''
-def one_cut_known_axis(axis="X", shots=10000):
-    # Get the random circuit with a specific axis of rotation, then reconstruct
-    circ,subcirc1,subcirc2 = gen_random_circuit_specific_rotation(axis)
-    pA, pB = run_subcirc_known_axis(subcirc1, subcirc2, axis, shots)
-    # pA, pB = run_subcirc(subcirc1, subcirc2, shots)
+def one_cut_known_axis(axis="X", shots=20000, run_on_real_device=False):
+    # get the type of device we want to run on
+    if run_on_real_device:
+        device = get_least_busy_real_device()
+        subcirc_size = (device.configuration().n_qubits + 1) // 2
+    else:
+        device = Aer.get_backend('aer_simulator')
+        subcirc_size = 3
+    # Get the random circuit with a specific axis of rotation
+    circ,subcirc1,subcirc2 = gen_random_circuit_specific_rotation(axis, subcirc_size)
+    # reconstruct using the golden cutting method and the desired device & shots
+    pA, pB = run_subcirc_known_axis(subcirc1, subcirc2, axis, device, shots)
     reconstructed = reconstruct_exact(pA,pB,subcirc1.width(),subcirc2.width())
 
     # Run the full circuit for comparison with reconstruction
-    simulator = Aer.get_backend('aer_simulator')
-    circ_ = transpile(circ, simulator)
-    counts = simulator.run(circ_, shots=shots).result().get_counts()
+    circ_ = transpile(circ, device)
+    job = device.run(circ_, shots=shots)
+    ic("full circuit", job.job_id())
+    counts = job.result().get_counts()
     # print two different methods of determining the distance between bitstring distributions
     ic(totalVariationalDistance(reconstructed, counts))
     ic(weighted_distance(reconstructed, counts))
@@ -162,8 +171,20 @@ def compare_golden_and_standard(trials=1000, max_size=5, shots=10000):
     ax.set_ylabel('Time (s)')
     plt.show()
 
+def get_least_busy_real_device():
+    IBMQ.load_account()
+    provider = IBMQ.get_provider(hub='ibm-q')
+    real_devices = provider.backends(filters=lambda x: not x.configuration().simulator)
+    device = least_busy(real_devices)
+
+    return device
+
+
+
+# get_least_busy_real_device()
+
 # gen_random_circuit_specific_rotation("X", 5)
-one_cut_known_axis()
+one_cut_known_axis(axis='X', shots=1000, run_on_real_device=True)
 
 # compare_golden_and_standard()
 # compare_golden_and_standard(trials=100, max_size=3, shots=10)

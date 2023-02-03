@@ -2,6 +2,7 @@ import numpy as np
 from qiskit import QuantumCircuit, Aer, transpile
 from qiskit.tools.visualization import plot_histogram
 import matplotlib.pyplot as plt
+from icecream import ic
 
 
 
@@ -88,7 +89,7 @@ def run_subcirc(subcirc1, subcirc2,shots=10000):
     measure in the relevant axes and use that data to reconstruct
     the correct distribution
 '''
-def run_subcirc_known_axis(subcirc1, subcirc2, axis, shots=10000):
+def run_subcirc_known_axis(subcirc1, subcirc2, axis, device, shots=10000):
     # Get the number of qubits in each subcircuit
     nA = subcirc1.width()
     nB = subcirc2.width()
@@ -114,10 +115,10 @@ def run_subcirc_known_axis(subcirc1, subcirc2, axis, shots=10000):
             subcirc1_.h(nA-1)
         subcirc1_.measure_all()
 
-        simulator = Aer.get_backend('aer_simulator')
-        circ = transpile(subcirc1_, simulator)
-        result = simulator.run(circ,shots=shots).result()
-        counts = result.get_counts(circ)
+        circ = transpile(subcirc1_, device)
+        job = device.run(circ,shots=shots)
+        ic("pA job", job.job_id())
+        counts = job.result().get_counts(circ)
 
         for n in range(2**nA,2**(nA+1)):
             # ss = subcirc1.width()
@@ -147,10 +148,10 @@ def run_subcirc_known_axis(subcirc1, subcirc2, axis, shots=10000):
             subcirc2_ = init.compose(subcirc2)
             subcirc2_.measure_all()
 
-            simulator = Aer.get_backend('aer_simulator')
-            circ = transpile(subcirc2_, simulator)
-            result = simulator.run(circ,shots=shots).result()
-            counts = result.get_counts(circ)
+            circ = transpile(subcirc2_, device)
+            job = device.run(circ,shots=shots)
+            ic("pB job", job.job_id())
+            counts = job.result().get_counts(circ)
 
             for n in range(2**nB,2**(nB+1)):
                 bstr = bin(n)
