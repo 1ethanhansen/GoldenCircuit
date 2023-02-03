@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 
 from reconstruct import *
+from distances import *
 from qiskit.circuit.random import random_circuit
 from qiskit.visualization import plot_histogram
 from qiskit import QuantumCircuit, Aer, transpile
@@ -10,6 +11,7 @@ import time
 import random
 import numpy as np
 import scipy.stats as st
+
 
 
 ''' Create a random circuit where only 1 axis of the bloch
@@ -29,10 +31,9 @@ def gen_random_circuit_specific_rotation(axis, subcirc_size=2):
     if axis == "X":
         subcirc1.rx(theta, [i for i in range(0, subcirc_size)])
     elif axis == "Y":
-        subcirc1.ry(theta, [0])
+        subcirc1.ry(theta, [i for i in range(0, subcirc_size)])
 
     subcirc1_non_shared = random_circuit(subcirc_size-1, subcirc_size//2)
-
     subcirc1.compose(subcirc1_non_shared, inplace=True)
         
     # Optionally add entangling gate between qubits 0 and 1
@@ -48,7 +49,7 @@ def gen_random_circuit_specific_rotation(axis, subcirc_size=2):
     # create the full circuit
     fullcirc = QuantumCircuit(subcirc_size*2 - 1)
     fullcirc.compose(subcirc1, inplace=True)
-    fullcirc.cnot(subcirc_size-1, subcirc_size)
+    fullcirc.barrier()
     fullcirc.compose(subcirc2, qubits=[i for i in range(subcirc_size-1, subcirc_size*2-1)], inplace=True)
     fullcirc.measure_all()
 
@@ -70,16 +71,18 @@ def one_cut_known_axis(axis="X", shots=10000):
     circ,subcirc1,subcirc2 = gen_random_circuit_specific_rotation(axis)
     pA, pB = run_subcirc_known_axis(subcirc1, subcirc2, axis, shots)
     # pA, pB = run_subcirc(subcirc1, subcirc2, shots)
-    exact = reconstruct_exact(pA,pB,subcirc1.width(),subcirc2.width())
+    reconstructed = reconstruct_exact(pA,pB,subcirc1.width(),subcirc2.width())
 
     # Run the full circuit for comparison with reconstruction
     simulator = Aer.get_backend('aer_simulator')
     circ_ = transpile(circ, simulator)
     counts = simulator.run(circ_, shots=shots).result().get_counts()
-    # print(counts)
+    # print two different methods of determining the distance between bitstring distributions
+    ic(totalVariationalDistance(reconstructed, counts))
+    ic(weighted_distance(reconstructed, counts))
 
     # Plot both of the results to see visually if they are the same
-    plot_histogram(exact, title=f"reconstructed for {axis}")
+    plot_histogram(reconstructed, title=f"reconstructed for {axis}")
     plot_histogram(counts, title=f"full circ for {axis}")
 
     plt.show()
@@ -160,7 +163,7 @@ def compare_golden_and_standard(trials=1000, max_size=5, shots=10000):
     plt.show()
 
 # gen_random_circuit_specific_rotation("X", 5)
-# one_cut_known_axis()
+one_cut_known_axis()
 
-compare_golden_and_standard()
+# compare_golden_and_standard()
 # compare_golden_and_standard(trials=100, max_size=3, shots=10)
