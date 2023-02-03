@@ -78,7 +78,7 @@ def one_cut_known_axis(axis="X", shots=20000, run_on_real_device=False):
     # Get the random circuit with a specific axis of rotation
     circ,subcirc1,subcirc2 = gen_random_circuit_specific_rotation(axis, subcirc_size)
     # reconstruct using the golden cutting method and the desired device & shots
-    pA, pB = run_subcirc_known_axis(subcirc1, subcirc2, axis, device, shots)
+    pA, pB, _ = run_subcirc_known_axis(subcirc1, subcirc2, axis, device, shots)
     reconstructed = reconstruct_exact(pA,pB,subcirc1.width(),subcirc2.width())
 
     # remove any entry that is 0
@@ -96,9 +96,9 @@ def one_cut_known_axis(axis="X", shots=20000, run_on_real_device=False):
     counts = job.result().get_counts()
 
     # code for getting the time it took to run the circuit (potentially useful later)
-    time_per_step = job.time_per_step()
-    delta_seconds = (time_per_step['COMPLETED'] - time_per_step['RUNNING']).total_seconds()
-    ic("full circuit", delta_seconds)
+    # time_per_step = job.time_per_step()
+    # delta_seconds = (time_per_step['COMPLETED'] - time_per_step['RUNNING']).total_seconds()
+    # ic("full circuit time", delta_seconds)
 
     # print two different methods of determining the distance between bitstring distributions
     ic(totalVariationalDistance(reconstructed, counts))
@@ -114,9 +114,15 @@ def one_cut_known_axis(axis="X", shots=20000, run_on_real_device=False):
 ''' This function runs both the golden method and the standard method,
     timing each to determine runtime differences.
 '''
-def compare_golden_and_standard(trials=1000, max_size=5, shots=10000):
+def compare_golden_and_standard(trials=1000, max_size=5, shots=10000, run_on_real_device=False):
     max_size = max_size+1   # make max_size inclusive
-    device = Aer.get_backend('aer_simulator')   # create simulator device
+    # get the type of device we want to run on
+    if run_on_real_device:
+        device = get_least_busy_real_device()
+        max_size = min(max_size, (device.configuration().n_qubits + 1) // 2)
+        ic(max_size)
+    else:
+        device = Aer.get_backend('aer_simulator')
     # The axes available to us. For info on why "Z" is not an option,
     #   please see the paper
     axes = ["X", "Y"]
@@ -134,19 +140,19 @@ def compare_golden_and_standard(trials=1000, max_size=5, shots=10000):
             circ,subcirc1,subcirc2 = gen_random_circuit_specific_rotation(axis)
 
             # time how long it takes to run and reconstruct using the golden method
+            pA, pB, execution_time = run_subcirc_known_axis(subcirc1, subcirc2, axis, device, shots)
             start = time.time()
-            pA, pB = run_subcirc_known_axis(subcirc1, subcirc2, axis, device, shots)
             exact = reconstruct_exact(pA,pB,subcirc1.width(),subcirc2.width())
             end = time.time()
-            elapsed = end-start
+            elapsed = (end-start) + execution_time
             golden_times[subcirc_size-2][trial] = elapsed
 
             # time how long it takes to run and reconstruct using the standard method
+            pA, pB, execution_time = run_subcirc(subcirc1, subcirc2, device, shots)
             start = time.time()
-            pA, pB = run_subcirc(subcirc1, subcirc2, shots)
             exact = reconstruct_exact(pA,pB,subcirc1.width(),subcirc2.width())
             end = time.time()
-            elapsed = end-start
+            elapsed = (end-start) + execution_time
             standard_times[subcirc_size-2][trial] = elapsed
     
     # Now that all the data is in, analyse it
@@ -196,7 +202,7 @@ def get_least_busy_real_device():
 
 
 # gen_random_circuit_specific_rotation("X", 5)
-one_cut_known_axis(axis='X', shots=20000, run_on_real_device=True)
+# one_cut_known_axis(axis='X', shots=20000, run_on_real_device=True)
 
 # compare_golden_and_standard()
-# compare_golden_and_standard(trials=100, max_size=3, shots=10)
+compare_golden_and_standard(trials=4, max_size=2, shots=100, run_on_real_device=True)
