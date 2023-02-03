@@ -81,6 +81,14 @@ def one_cut_known_axis(axis="X", shots=20000, run_on_real_device=False):
     pA, pB = run_subcirc_known_axis(subcirc1, subcirc2, axis, device, shots)
     reconstructed = reconstruct_exact(pA,pB,subcirc1.width(),subcirc2.width())
 
+    # remove any entry that is 0
+    keys_to_delete = []
+    for key, value in reconstructed.items():
+        if value == 0:
+            keys_to_delete.append(key)
+    for key in keys_to_delete:
+        del reconstructed[key]
+
     # Run the full circuit for comparison with reconstruction
     circ_ = transpile(circ, device)
     job = device.run(circ_, shots=shots)
@@ -180,11 +188,8 @@ def get_least_busy_real_device():
     return device
 
 
-
-# get_least_busy_real_device()
-
 # gen_random_circuit_specific_rotation("X", 5)
-one_cut_known_axis(axis='X', shots=1000, run_on_real_device=True)
+one_cut_known_axis(axis='X', shots=1000, run_on_real_device=False)
 
 # compare_golden_and_standard()
 # compare_golden_and_standard(trials=100, max_size=3, shots=10)
