@@ -207,8 +207,8 @@ def run_subcirc_known_axis(subcirc1, subcirc2, axis, device, shots=10000):
 
 
 def reconstruct_bstr(bstr,pA,pB,nA,nB):
-    indB = int(bstr[3:3 + nB], 2)
-    indA = int(bstr[3 + nB:len(bstr)], 2)
+    indB = int(bstr[0:nB], 2)
+    indA = int(bstr[nB:len(bstr)], 2)
 
     p = [gamma(beta, ahat, e) * pA[indA, ahat, beta] * pB[indB, e, beta] for beta in [0, 1, 2] for ahat in [0, 1] for e in [0, 1]]
     p = np.sum(np.array(p)) / 2
@@ -220,7 +220,7 @@ def reconstruct_exact(pA,pB,nA,nB):
     for n in range(2 ** (nA + nB - 1), 2 ** (nA + nB)):
         bstr = bin(n)
         string = bstr[3:len(bstr)]
-        p = reconstruct_bstr(bstr, pA, pB, nA, nB)
+        p = reconstruct_bstr(string, pA, pB, nA, nB)
         p_rec[string] = p
 
     for k in p_rec.keys():
