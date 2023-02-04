@@ -101,10 +101,10 @@ def compare_golden_and_standard_fidelities(axis="X", shots=20000, run_on_real_de
     simulator_full_counts = job.result().get_counts()
 
     # just testing
-    pA, pB, _ = run_subcirc(subcirc1, subcirc2, simulator, shots)
-    standard = reconstruct_exact(pA,pB,subcirc1.width(),subcirc2.width())
-    ic(weighted_distance(standard, simulator_full_counts))
-    plot_histogram(standard, title="standard reconstruct")
+    # pA, pB, _ = run_subcirc(subcirc1, subcirc2, simulator, shots)
+    # standard = reconstruct_exact(pA,pB,subcirc1.width(),subcirc2.width())
+    # ic(weighted_distance(standard, simulator_full_counts))
+    # plot_histogram(standard, title="standard reconstruct")
 
     # print distances between what distributions we have and the ground truth distribution
     ic(weighted_distance(reconstructed, simulator_full_counts))
@@ -127,7 +127,7 @@ def compare_golden_and_standard_runtimes(trials=1000, max_size=5, shots=10000, r
     max_size = max_size+1   # make max_size inclusive
     # get the type of device we want to run on
     if run_on_real_device:
-        device = get_least_busy_real_device()
+        device = get_least_busy_real_device(qubits=5)
         max_size = min(max_size, (device.configuration().n_qubits + 1) // 2)
     else:
         device = Aer.get_backend('aer_simulator')
@@ -266,18 +266,21 @@ def analyze_runtime_arrays(golden_file_name, standard_file_name):
     ax.set_ylabel('Time (s)')
     plt.show()
 
-def get_least_busy_real_device():
+def get_least_busy_real_device(qubits=0):
     IBMQ.load_account()
     provider = IBMQ.get_provider(hub='ibm-q')
-    real_devices = provider.backends(filters=lambda x: not x.configuration().simulator and x.configuration().n_qubits == 5)
+    if qubits == 0:
+        real_devices = provider.backends(filters=lambda x: not x.configuration().simulator)
+    else:
+        real_devices = provider.backends(filters=lambda x: not x.configuration().simulator and x.configuration().n_qubits == qubits)
     device = least_busy(real_devices)
 
     return device
 
 
 # gen_random_circuit_specific_rotation("X", 5)
-# compare_golden_and_standard_fidelities(axis='Y', shots=20000, run_on_real_device=False)
+compare_golden_and_standard_fidelities(axis='X', shots=10000, run_on_real_device=True)
 
 # compare_golden_and_standard_runtimes()
 # compare_golden_and_standard_runtimes(trials=1, max_size=2, shots=10, run_on_real_device=True)
-compare_golden_and_standard_runtimes(trials=50, max_size=2, shots=100, run_on_real_device=True)
+# compare_golden_and_standard_runtimes(trials=50, max_size=2, shots=100, run_on_real_device=True)
