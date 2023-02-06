@@ -46,9 +46,7 @@ def run_subcirc(subcirc1, subcirc2, device, shots=10000):
         counts = job.result().get_counts(circ)
         # Get the total time actually spent running the circuit and add to total
         if not device.configuration().simulator:
-            time_per_step = job.time_per_step()
-            delta_seconds = (time_per_step['COMPLETED'] - time_per_step['RUNNING']).total_seconds()
-            total_time += delta_seconds
+            total_time += job.result().time_taken
 
         for n in range(2**nA,2**(nA+1)):
             # ss = subcirc1.width()
@@ -84,9 +82,7 @@ def run_subcirc(subcirc1, subcirc2, device, shots=10000):
             counts = job.result().get_counts(circ)
             # Get the total time actually spent running the circuit and add to total
             if not device.configuration().simulator:
-                time_per_step = job.time_per_step()
-                delta_seconds = (time_per_step['COMPLETED'] - time_per_step['RUNNING']).total_seconds()
-                total_time += delta_seconds
+                total_time += job.result().time_taken
 
             for n in range(2**nB,2**(nB+1)):
                 bstr = bin(n)
@@ -145,9 +141,7 @@ def run_subcirc_known_axis(subcirc1, subcirc2, axis, device, shots=10000):
         counts = job.result().get_counts(circ)
         # Get the total time actually spent running the circuit and add to total
         if not device.configuration().simulator:
-            time_per_step = job.time_per_step()
-            delta_seconds = (time_per_step['COMPLETED'] - time_per_step['RUNNING']).total_seconds()
-            total_time += delta_seconds
+            total_time += job.result().time_taken
 
         for n in range(2**nA,2**(nA+1)):
             # ss = subcirc1.width()
@@ -183,9 +177,7 @@ def run_subcirc_known_axis(subcirc1, subcirc2, axis, device, shots=10000):
             counts = job.result().get_counts(circ)
             # Get the total time actually spent running the circuit and add to total
             if not device.configuration().simulator:
-                time_per_step = job.time_per_step()
-                delta_seconds = (time_per_step['COMPLETED'] - time_per_step['RUNNING']).total_seconds()
-                total_time += delta_seconds
+                total_time += job.result().time_taken
 
             for n in range(2**nB,2**(nB+1)):
                 bstr = bin(n)
