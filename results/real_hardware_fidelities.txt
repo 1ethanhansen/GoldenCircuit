@@ -1,0 +1,133 @@
+axis = X
+shots = 10k
+device = quito
+ic| weighted_distance(reconstructed, simulator_full_counts): 1.4074852085238574
+ic| weighted_distance(hardware_full_counts, simulator_full_counts): 0.5517542628262189
+
+axis = X
+shots = 10k
+device = lima
+ic| weighted_distance(reconstructed, simulator_full_counts): 0.017868887078699325
+ic| weighted_distance(hardware_full_counts, simulator_full_counts): 0.036953282633326506
+
+axis = Y
+shots = 10k
+device = lima
+ic| weighted_distance(reconstructed, simulator_full_counts): 0.024213309596474844
+ic| weighted_distance(hardware_full_counts, simulator_full_counts): 0.014257431624436339
+
+
+
+axis = Y
+shots = 10k
+device = oslo
+ic| weighted_distance(reconstructed, simulator_full_counts): 0.07526394884202078
+ic| weighted_distance(hardware_full_counts, simulator_full_counts): 0.38561365905205575
+
+axis = X
+shots = 10k
+device = oslo
+ic| weighted_distance(reconstructed, simulator_full_counts): 1.0829483048454138
+ic| weighted_distance(hardware_full_counts, simulator_full_counts): 1.09490807941074
+
+axis = X
+shots = 10k
+device = oslo
+ic| weighted_distance(reconstructed, simulator_full_counts): 0.07958280792472788
+ic| weighted_distance(hardware_full_counts, simulator_full_counts): 0.10808728769875667
+
+axis = X
+shots = 10k
+device = oslo
+ic| weighted_distance(reconstructed, simulator_full_counts): 0.41526155600130654
+ic| weighted_distance(hardware_full_counts, simulator_full_counts): 1.4795683851309027
+
+axis = X
+shots = 10k
+device = oslo
+ic| weighted_distance(reconstructed, simulator_full_counts): 2.168616476483447
+ic| weighted_distance(hardware_full_counts, simulator_full_counts): 1.3467772706328958
+
+axis = X
+shots = 10k
+device = oslo
+ic| weighted_distance(reconstructed, simulator_full_counts): 0.23079945962832776
+ic| weighted_distance(hardware_full_counts, simulator_full_counts): 0.22102615357080838
+
+axis = X
+shots = 10k
+device = oslo
+ic| weighted_distance(reconstructed, simulator_full_counts): 0.12109898569985258
+ic| weighted_distance(hardware_full_counts, simulator_full_counts): 0.17492552917486862
+
+axis = X
+shots = 10k
+device = oslo
+ic| weighted_distance(reconstructed, simulator_full_counts): 1.0107215383364128
+ic| weighted_distance(hardware_full_counts, simulator_full_counts): 16.208313364517377
+
+axis = Y
+shots = 10k
+device = nairobi
+ic| weighted_distance(reconstructed, simulator_full_counts): 0.3663553976629582
+ic| weighted_distance(hardware_full_counts, simulator_full_counts): 0.0450318546172423
+
+axis = Y
+shots = 10k
+device = nairobi
+ic| weighted_distance(reconstructed, simulator_full_counts): 0.33631449447336226
+ic| weighted_distance(hardware_full_counts, simulator_full_counts): 0.30973225630203866
+
+
+
+
+
+
+
+
+
+
+
+
+
+axis = X
+shots = 10k
+device = manila
+ic| weighted_distance(reconstructed, simulator_full_counts): 0.006091082239396866
+ic| weighted_distance(hardware_full_counts, simulator_full_counts): 0.00595196698567
+
+axis = X
+shots = 10k
+device = manila
+ic| weighted_distance(reconstructed, simulator_full_counts): 0.018155823945393917
+ic| weighted_distance(hardware_full_counts, simulator_full_counts): 0.009381460795516607
+
+axis = Y
+shots = 10k
+device = manila
+ic| weighted_distance(reconstructed, simulator_full_counts): 0.5269854324922746
+ic| weighted_distance(hardware_full_counts, simulator_full_counts): 1.1280944173293714
+
+axis = Y
+shots = 10k
+device = manila
+ic| weighted_distance(reconstructed, simulator_full_counts): 0.04826506825923811
+ic| weighted_distance(hardware_full_counts, simulator_full_counts): 0.038188494657883265
+
+axis = X
+shots = 10k
+device = lima
+ic| weighted_distance(reconstructed, simulator_full_counts): 0.030888714532464178
+ic| weighted_distance(hardware_full_counts, simulator_full_counts): 0.01557064911715274
+
+axis = Y
+shots = 10k
+device = quito
+ic| weighted_distance(reconstructed, simulator_full_counts): 0.03580744717827404
+ic| weighted_distance(hardware_full_counts, simulator_full_counts): 0.04533825851015292
+
+axis = X
+shots = 10k
+device = manila
+ic| weighted_distance(reconstructed, simulator_full_counts): 1.085320314963532
+ic| weighted_distance(hardware_full_counts, simulator_full_counts): 0.5288732310281644

@@ -207,16 +207,18 @@ def analyze_runtime_arrays(golden_file_name, standard_file_name):
     # load arrays from the files for analysis
     golden_times = np.load(golden_file_name)
     standard_times = np.load(standard_file_name)
-    # # remove the non-found elements
-    # golden_times = golden_times[golden_times != 0.0]
-    # standard_times = standard_times[standard_times != 0.0]
     # get the total number of trials
     shape = golden_times.shape
-    if len(shape) == 1:
-        trials = shape[0]
+    if shape[0] == 1:
+        trials = np.count_nonzero(golden_times)
     else:
+        # for now, just assume that if we did multiple subcirc sizes,
+        #   all sizes completed all trials
         trials = shape[1]
+        ic(shape)
     ic("total trials", trials)
+    golden_times = golden_times[: , 0:trials]
+    standard_times = standard_times[: , 0:trials]
     # Get mean and standard error for runtime for each size of subcircuit
     golden_means = golden_times.mean(axis=1)
     golden_sems = np.std(golden_times, axis=1, ddof=1) / np.sqrt(trials)
@@ -234,11 +236,11 @@ def analyze_runtime_arrays(golden_file_name, standard_file_name):
 
         # for both golden and standard methods, find the upper and lower bounds of
         #   the 95% confidence interval - then find what that is in terms of symmmetric +/-
-        overall_interval = st.t.interval(confidence=0.95, df=trials-1, loc=golden_means[i], scale=golden_sems[i])
+        overall_interval = st.t.interval(confidence=0.99, df=trials-1, loc=golden_means[i], scale=golden_sems[i])
         plus_minus = (overall_interval[1] - overall_interval[0]) / 2
         golden_interval[i] = plus_minus
 
-        overall_interval = st.t.interval(confidence=0.95, df=trials-1, loc=standard_means[i], scale=standard_sems[i])
+        overall_interval = st.t.interval(confidence=0.99, df=trials-1, loc=standard_means[i], scale=standard_sems[i])
         plus_minus = (overall_interval[1] - overall_interval[0]) / 2
         standard_interval[i] = plus_minus
 
@@ -274,6 +276,8 @@ def get_least_busy_real_device(qubits=0):
     else:
         real_devices = provider.backends(filters=lambda x: not x.configuration().simulator and x.configuration().n_qubits == qubits)
     device = least_busy(real_devices)
+    # device = provider.get_backend('ibmq_lima')
+    # device = provider.get_backend('ibm_nairobi')
 
     return device
 
@@ -283,4 +287,6 @@ compare_golden_and_standard_fidelities(axis='X', shots=10000, run_on_real_device
 
 # compare_golden_and_standard_runtimes()
 # compare_golden_and_standard_runtimes(trials=1, max_size=2, shots=10, run_on_real_device=True)
-# compare_golden_and_standard_runtimes(trials=50, max_size=2, shots=100, run_on_real_device=True)
+# compare_golden_and_standard_runtimes(trials=50, max_size=2, shots=1000, run_on_real_device=True)
+
+# analyze_runtime_arrays("results/golden_times_50_trials_3_size_1000_shots_True_real.npy", "results/standard_times_50_trials_3_size_1000_shots_True_real.npy")
