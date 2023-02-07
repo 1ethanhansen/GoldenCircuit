@@ -236,11 +236,11 @@ def analyze_runtime_arrays(golden_file_name, standard_file_name):
 
         # for both golden and standard methods, find the upper and lower bounds of
         #   the 95% confidence interval - then find what that is in terms of symmmetric +/-
-        overall_interval = st.t.interval(confidence=0.99, df=trials-1, loc=golden_means[i], scale=golden_sems[i])
+        overall_interval = st.t.interval(confidence=0.95, df=trials-1, loc=golden_means[i], scale=golden_sems[i])
         plus_minus = (overall_interval[1] - overall_interval[0]) / 2
         golden_interval[i] = plus_minus
 
-        overall_interval = st.t.interval(confidence=0.99, df=trials-1, loc=standard_means[i], scale=standard_sems[i])
+        overall_interval = st.t.interval(confidence=0.95, df=trials-1, loc=standard_means[i], scale=standard_sems[i])
         plus_minus = (overall_interval[1] - overall_interval[0]) / 2
         standard_interval[i] = plus_minus
 
@@ -251,12 +251,13 @@ def analyze_runtime_arrays(golden_file_name, standard_file_name):
     if len(golden_means) == 1:
         # if we only ran one subcircuit size, just display the two means as a bar chart with error bars
         labels = ["Standard", "Golden"]
+        colors = ['#BF616A', '#FFD700']
         x_pos = np.arange(len(labels))
         means = [standard_means[0], golden_means[0]]
         errors = [standard_interval[0], golden_interval[0]]
-        ax.bar(x_pos, means, yerr=errors, align='center', color='#BF616A', ecolor='#2E3440', capsize=10)
-        ax.set_title('Time vs reconstruction type')
-        ax.set_xlabel('Subcircuit size (width)')
+        ax.bar(x_pos, means, yerr=errors, align='center', color=colors, ecolor='#2E3440', capsize=10)
+        ax.set_title('Comparing runtimes on real hardware')
+        ax.set_xlabel('Reconstruction type')
         ax.set_xticks(x_pos)
         ax.set_xticklabels(labels)
     else:
@@ -266,6 +267,7 @@ def analyze_runtime_arrays(golden_file_name, standard_file_name):
         ax.set_title('Time vs subcircuit size')
         ax.set_xlabel('Subcircuit size (width)')
     ax.set_ylabel('Time (s)')
+    plt.savefig('results/real_devices_5_qubit_1k_shots_50_trials_95_confidence.png')
     plt.show()
 
 def get_least_busy_real_device(qubits=0):
@@ -278,15 +280,16 @@ def get_least_busy_real_device(qubits=0):
     device = least_busy(real_devices)
     # device = provider.get_backend('ibmq_lima')
     # device = provider.get_backend('ibm_nairobi')
+    device = provider.get_backend('ibmq_quito')
 
     return device
 
 
 # gen_random_circuit_specific_rotation("X", 5)
-compare_golden_and_standard_fidelities(axis='X', shots=10000, run_on_real_device=True)
+# compare_golden_and_standard_fidelities(axis='X', shots=10000, run_on_real_device=True)
 
 # compare_golden_and_standard_runtimes()
 # compare_golden_and_standard_runtimes(trials=1, max_size=2, shots=10, run_on_real_device=True)
 # compare_golden_and_standard_runtimes(trials=50, max_size=2, shots=1000, run_on_real_device=True)
 
-# analyze_runtime_arrays("results/golden_times_50_trials_3_size_1000_shots_True_real.npy", "results/standard_times_50_trials_3_size_1000_shots_True_real.npy")
+analyze_runtime_arrays("results/golden_times_50_trials_3_size_1000_shots_True_real.npy", "results/standard_times_50_trials_3_size_1000_shots_True_real.npy")

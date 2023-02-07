@@ -47,7 +47,7 @@ seven_qubit_full = np.array([0.38561365905205575,
 
 vals_to_plot = np.array([])
 errs_to_plot = np.array([])
-labels = ["5 qubit full circuit", "5 qubit reconstructed", "7 qubit full circuit", "7 qubit reconstructed"]
+labels = ["5 qubit full", "5 qubit reconstruct", "7 qubit full", "7 qubit reconstruct"]
 
 five_full_mean = five_qubit_full.mean()
 five_reconstruct_mean = five_qubit_reconstructed.mean()
@@ -87,10 +87,11 @@ x_pos = np.arange(len(labels))
 colors = ['#BF616A', '#FFD700', '#BF616A', '#FFD700']
 fig, ax = plt.subplots()
 ax.bar(x_pos, vals_to_plot, yerr=errs_to_plot, align='center', color=colors, ecolor='#2E3440', capsize=10)
-ax.set_title('Comparison of fidelities')
+ax.set_title('Comparison of weighted distances')
 ax.set_ylabel('Average weighted distance')
 ax.set_xlabel('Run type and size of device')
 ax.set_xticks(x_pos)
 ax.set_xticklabels(labels)
 
-plt.show()
+plt.savefig('results/comparison_of_distances.png')
+# plt.show()

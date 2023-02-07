@@ -1,0 +1,6 @@
+ic| 'total trials', trials: 50
+ic| i+2: 2
+ic| golden_means[i]: 12.617409687042237
+    standard_means[i]: 18.843629279136657
+    golden_sems[i]: 0.04109688789984351
+    standard_sems[i]: 0.054430584738938095
