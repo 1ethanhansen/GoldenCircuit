@@ -48,9 +48,9 @@ def gen_random_circuit_specific_rotation(axis, subcirc_size=2):
     fullcirc.compose(subcirc2, qubits=[i for i in range(subcirc_size-1, subcirc_size*2-1)], inplace=True)
     fullcirc.measure_all()
 
-    # print(subcirc1)
-    # print(subcirc2)
-    # print(fullcirc)
+    print(subcirc1)
+    print(subcirc2)
+    print(fullcirc)
 
     return fullcirc, subcirc1, subcirc2
 
@@ -75,7 +75,8 @@ def compare_golden_and_standard_fidelities(axis="X", shots=20000, run_on_real_de
     circ,subcirc1,subcirc2 = gen_random_circuit_specific_rotation(axis, subcirc_size)
     # reconstruct using the golden cutting method and the desired device & shots
     if run_on_real_device:
-        pA, pB, _ = run_subcirc_known_axis(subcirc1, subcirc2, axis, device, shots)
+        # pA, pB, _ = run_subcirc_known_axis(subcirc1, subcirc2, axis, device, shots)
+        pA, pB, _ = run_subcirc_known_axis_batched(subcirc1, subcirc2, axis, device, shots)
     else:
         pA, pB, _ = run_subcirc_known_axis(subcirc1, subcirc2, axis, simulator, shots)
     reconstructed = reconstruct_exact(pA,pB,subcirc1.width(),subcirc2.width())
@@ -280,16 +281,16 @@ def get_least_busy_real_device(qubits=0):
     device = least_busy(real_devices)
     # device = provider.get_backend('ibmq_lima')
     # device = provider.get_backend('ibm_nairobi')
-    device = provider.get_backend('ibmq_quito')
+    # device = provider.get_backend('ibmq_quito')
 
     return device
 
 
-# gen_random_circuit_specific_rotation("X", 5)
-# compare_golden_and_standard_fidelities(axis='X', shots=10000, run_on_real_device=True)
+# gen_random_circuit_specific_rotation("X", 3)
+compare_golden_and_standard_fidelities(axis='X', shots=10000, run_on_real_device=True)
 
 # compare_golden_and_standard_runtimes()
 # compare_golden_and_standard_runtimes(trials=1, max_size=2, shots=10, run_on_real_device=True)
 # compare_golden_and_standard_runtimes(trials=50, max_size=2, shots=1000, run_on_real_device=True)
 
-analyze_runtime_arrays("results/golden_times_50_trials_3_size_1000_shots_True_real.npy", "results/standard_times_50_trials_3_size_1000_shots_True_real.npy")
+# analyze_runtime_arrays("results/golden_times_50_trials_3_size_1000_shots_True_real.npy", "results/standard_times_50_trials_3_size_1000_shots_True_real.npy")
