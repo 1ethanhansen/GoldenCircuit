@@ -17,6 +17,54 @@ import scipy.stats as st
 
 
 
+''' we want to be able to
+    do this for multiple numbers of iterations:
+    0. create a circuit and know if it's golden or not
+    1. run the upstream circuits
+    2. decide whether to run the downstream circuit based on those values
+    3. evaluate whether it correctly identified golden/not
+
+    do this for multiples amounts of "delta" in a direction that makes it not quite golden
+    0. create a circuit and know if it's golden or not
+    1. add in a certain amount of "delta"
+    2. run the upstream circuits
+    3. decide whether to run the downstream circuit based on those values
+    4. run the downstream circuit (or not)
+    4. reconstruct
+    5. evaluate how high the fidelity was
+
+    steps that can be run as batched jobs: 0 and 1, 2 and 3 and 4
+'''
+
+
+
+''' Create a circuit that definitely does *not* have a golden cutting point
+'''
+def gen_random_circuit_not_golden(subcirc_size=2):
+    # create some random gates for the upstream circuit
+    subcirc1 = random_circuit(subcirc_size, subcirc_size)
+
+    # make sure the last qubit in upstream circuit is not a golden cutting point
+    theta = random.uniform(0.1, 3)
+    subcirc1.rx(theta, subcirc_size-1)
+    subcirc1.ry(theta, subcirc_size-1)
+    subcirc1.rz(theta, subcirc_size-1)
+
+    # create the random downstream circuit
+    subcirc2 = random_circuit(subcirc_size, subcirc_size)
+
+    # create the full circuit
+    fullcirc = QuantumCircuit(subcirc_size*2 - 1)
+    fullcirc.compose(subcirc1, inplace=True)
+    fullcirc.compose(subcirc2, qubits=[i for i in range(subcirc_size-1, subcirc_size*2-1)], inplace=True)
+    fullcirc.measure_all()
+
+    print(subcirc1)
+    print(subcirc2)
+    print(fullcirc)
+
+    return fullcirc, subcirc1, subcirc2
+
 ''' Create a random circuit where only 1 axis of the bloch
     sphere on the first qubit is rotated so only 2 measurements
     must be done later
@@ -36,11 +84,11 @@ def gen_random_circuit_specific_rotation(axis, subcirc_size=2):
     elif axis == "Y":
         subcirc1.ry(theta, [i for i in range(0, subcirc_size)])
 
-    subcirc1_non_shared = random_circuit(subcirc_size-1, subcirc_size//2)
+    subcirc1_non_shared = random_circuit(subcirc_size-1, subcirc_size)
     subcirc1.compose(subcirc1_non_shared, inplace=True)
 
     # Create a random second half of the circuit
-    subcirc2 = random_circuit(subcirc_size, subcirc_size//2)
+    subcirc2 = random_circuit(subcirc_size, subcirc_size)
 
     # create the full circuit
     fullcirc = QuantumCircuit(subcirc_size*2 - 1)
@@ -53,6 +101,36 @@ def gen_random_circuit_specific_rotation(axis, subcirc_size=2):
     print(fullcirc)
 
     return fullcirc, subcirc1, subcirc2
+
+
+''' Function to do hypothesis testing with different alpha values and
+    different numbers of shots
+'''
+def create_hypothesis_test_plot(n_trials):
+    alphas = [0.1, 0.01, 0.001]
+    shots = [10, 100, 1000, 10000]
+
+    for alpha in alphas:
+        for shot in shots:
+            # file names specifying information about this configuration
+            golden_file_name = f"results/golden_percents_alpha_{alpha}_shot_{shots}.npy"
+            standard_file_name = f"results/nongolden_percents_alpha_{alpha}_shot_{shots}.npy"
+            # if either of those files doesn't exist, create them
+            if not os.path.isfile(golden_file_name):
+                # Arrays to store the timing results
+                golden_vals = np.zeros([2])
+                np.save(golden_file_name, golden_vals)
+            if not os.path.isfile(standard_file_name):
+                standard_vals = np.zeros([2])
+                np.save(standard_file_name, standard_vals)
+
+            # load in saved values, allowing for stopping the program
+            golden_vals = np.load(golden_file_name)
+            nongolden_vals = np.load(standard_file_name)
+            
+            while golden_vals[1] < n_trials:
+                circ,subcirc1,subcirc2 = gen_random_circuit_specific_rotation("X", 2)
+                
 
 
 ''' For a given axis (X,Y,Z) create subcircuits and a full circuit
@@ -282,12 +360,24 @@ def get_least_busy_real_device(qubits=0):
     # device = provider.get_backend('ibmq_lima')
     # device = provider.get_backend('ibm_nairobi')
     # device = provider.get_backend('ibmq_quito')
+    device = provider.get_backend('simulator_statevector')
 
     return device
 
 
+def test_one():
+    circ,subcirc1,subcirc2 = gen_random_circuit_specific_rotation("X", 2)
+    # circ,subcirc1,subcirc2 = gen_random_circuit_not_golden(2)
+    device = get_least_busy_real_device()
+    pA, pB, val = run_subcirc_axis_testing_batched(subcirc1, subcirc2, "X", device, shots=1000)
+
+    ic(val)
+
 # gen_random_circuit_specific_rotation("X", 3)
-compare_golden_and_standard_fidelities(axis='X', shots=10000, run_on_real_device=True)
+# compare_golden_and_standard_fidelities(axis='X', shots=10000, run_on_real_device=True)
+# gen_random_circuit_not_golden(3)
+test_one()
+
 
 # compare_golden_and_standard_runtimes()
 # compare_golden_and_standard_runtimes(trials=1, max_size=2, shots=10, run_on_real_device=True)

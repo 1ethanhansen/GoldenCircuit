@@ -6,6 +6,14 @@ import matplotlib.pyplot as plt
 import time
 from icecream import ic
 
+def create_parities_array(num_qubits):
+    array = np.zeros(2**num_qubits)
+    for i in range(2**num_qubits):
+        if i % 2 == 0:
+            array[i] = 1
+        else:
+            array[i] = -1
+    return array
 
 
 def gamma(beta,ahat,e):
@@ -100,6 +108,92 @@ def run_subcirc(subcirc1, subcirc2, device, shots=10000):
         total_time = end_time - start_time
     
     return pA, pB, total_time
+
+
+''' function to create a batched job to send to IBMQ with all upstream and downstream
+    subcircuits we want to run and return just the cut qubit's probability too
+'''
+def run_subcirc_axis_testing_batched(subcirc1, subcirc2, axis, device, shots=10000):
+    total_time = 0
+    start_time = time.time()
+    # Get the number of qubits in each subcircuit
+    nA = subcirc1.width()
+    nB = subcirc2.width()
+
+    # all the bases to measure in
+    alpha = ['X','Y','Z']
+
+    # create the upstream (pA) subcircs:
+    circs = []
+    for x in alpha:
+        subcirc1_ = subcirc1.copy()
+        beta = 2
+        if x == 'X':
+            beta = 0
+            subcirc1_.h(nA-1)
+        elif x == 'Y':
+            beta = 1
+            subcirc1_.sdg(nA-1)
+            subcirc1_.h(nA-1)
+        subcirc1_.measure_all()
+
+        circ = transpile(subcirc1_, device)
+        circs.append(circ)
+
+    # create the downstream (pB) subcircs:
+    for x in alpha:
+        for e in [0, 1]:
+            init = QuantumCircuit(nB)
+            beta = 2
+            if e == 1:
+                init.x(0)
+            if x == 'X':
+                beta = 0
+                init.h(0)
+            elif x == 'Y':
+                beta = 1
+                init.h(0)
+                init.s(0)
+            subcirc2_ = init.compose(subcirc2)
+            subcirc2_.measure_all()
+
+            circ = transpile(subcirc2_, device)
+            circs.append(circ)
+
+    # Submit all the circuits to be run on IBMQ as one batched job
+    job_manager = IBMQJobManager()
+    job_set = job_manager.run(circs, backend=device, name='up_down-stream_subcircs', shots=shots)
+    ic(job_set.job_set_id())
+    results = job_set.results()
+
+    # getting values needed for hypothesis testing
+    axis_estimates = [0, 0, 0]
+    axis_stddevs = [0, 0, 0]
+    for i in range(3):
+        # array of bitstring probabilities ($\hat{p}_b$ in the paper)
+        counts = results.get_counts(i)
+        for bin_num in range(2**nA):
+            if format(bin_num, '02b') not in counts.keys():
+                counts[format(bin_num, '02b')] = 0
+        bitstring_probabilities = np.array(list(counts.values())) / shots # $\hat{p}_S$
+        bitstring_parities = create_parities_array(2)   # $\chi$
+        # get the tau estimate 
+        estimate = np.dot(bitstring_probabilities, bitstring_parities)
+        axis_estimates[i] = abs(estimate)
+
+        # get the standard deviation of the tau estimate
+        diag_prob = np.diag(bitstring_probabilities)
+        prob_outer_prod = np.outer(bitstring_probabilities, bitstring_probabilities)
+        right_side = np.dot(diag_prob - prob_outer_prod, bitstring_parities)
+        final_mult = np.dot(bitstring_parities, right_side)
+        stddev = final_mult / shots
+        axis_stddevs[i] = stddev
+
+    pA = create_pA_from_batched_results(results, nA, alpha, shots)
+    pB = create_pB_from_batched_results(results, nB, alpha, shots)
+
+    # return info for reconstruction and hypothesis testing
+    return pA, pB, axis_estimates, axis_stddevs
 
 
 ''' function to create a batched job to send to IBMQ with all upstream and downstream
