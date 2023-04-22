@@ -18,7 +18,7 @@ import scipy.stats as st
 
 
 ''' we want to be able to
-    do this for multiple numbers of iterations:
+    do this for multiple numbers of shots and levels of alpha:
     0. create a circuit and know if it's golden or not
     1. run the upstream circuits
     2. decide whether to run the downstream circuit based on those values
@@ -42,13 +42,18 @@ import scipy.stats as st
 '''
 def gen_random_circuit_not_golden(subcirc_size=2):
     # create some random gates for the upstream circuit
-    subcirc1 = random_circuit(subcirc_size, subcirc_size)
+    # subcirc1 = random_circuit(subcirc_size, subcirc_size)
+    subcirc1 = QuantumCircuit(subcirc_size)
 
     # make sure the last qubit in upstream circuit is not a golden cutting point
-    theta = random.uniform(0.1, 3)
+    # theta = random.uniform(0.1, 1.5)
+    theta = 0.5
     subcirc1.rx(theta, subcirc_size-1)
     subcirc1.ry(theta, subcirc_size-1)
-    subcirc1.rz(theta, subcirc_size-1)
+    # subcirc1.rz(theta, subcirc_size-1)
+
+    subcirc1.rx(theta, 0)
+    subcirc1.ry(theta, 0)
 
     # create the random downstream circuit
     subcirc2 = random_circuit(subcirc_size, subcirc_size)
@@ -59,9 +64,9 @@ def gen_random_circuit_not_golden(subcirc_size=2):
     fullcirc.compose(subcirc2, qubits=[i for i in range(subcirc_size-1, subcirc_size*2-1)], inplace=True)
     fullcirc.measure_all()
 
-    print(subcirc1)
-    print(subcirc2)
-    print(fullcirc)
+    # print(subcirc1)
+    # print(subcirc2)
+    # print(fullcirc)
 
     return fullcirc, subcirc1, subcirc2
 
@@ -76,13 +81,16 @@ def gen_random_circuit_specific_rotation(axis, subcirc_size=2):
     # First half of our circuit (qubits 0 and 1)
     subcirc1 = QuantumCircuit(subcirc_size)
     # Get the random value to rotate
-    theta = random.uniform(0, 6.28)
+    # theta = random.uniform(0.1, 1.5)
+    theta = 0.5
 
     # Rotate just along the axis we want
     if axis == "X":
         subcirc1.rx(theta, [i for i in range(0, subcirc_size)])
+        subcirc1.ry(theta, 0)
     elif axis == "Y":
         subcirc1.ry(theta, [i for i in range(0, subcirc_size)])
+        subcirc1.rx(theta, 1)
 
     subcirc1_non_shared = random_circuit(subcirc_size-1, subcirc_size)
     subcirc1.compose(subcirc1_non_shared, inplace=True)
@@ -96,9 +104,9 @@ def gen_random_circuit_specific_rotation(axis, subcirc_size=2):
     fullcirc.compose(subcirc2, qubits=[i for i in range(subcirc_size-1, subcirc_size*2-1)], inplace=True)
     fullcirc.measure_all()
 
-    print(subcirc1)
-    print(subcirc2)
-    print(fullcirc)
+    # print(subcirc1)
+    # print(subcirc2)
+    # print(fullcirc)
 
     return fullcirc, subcirc1, subcirc2
 
@@ -106,16 +114,20 @@ def gen_random_circuit_specific_rotation(axis, subcirc_size=2):
 ''' Function to do hypothesis testing with different alpha values and
     different numbers of shots
 '''
-def create_hypothesis_test_plot(n_trials):
-    alphas = [0.1, 0.01, 0.001]
-    shots = [10, 100, 1000, 10000]
+def create_hypothesis_test_data(alphas, shots, n_trials=10):
+
+    simulator = Aer.get_backend('aer_simulator')
 
     for alpha in alphas:
         for shot in shots:
             # file names specifying information about this configuration
-            golden_file_name = f"results/golden_percents_alpha_{alpha}_shot_{shots}.npy"
-            standard_file_name = f"results/nongolden_percents_alpha_{alpha}_shot_{shots}.npy"
-            # if either of those files doesn't exist, create them
+            golden_file_name = f"results/fixedaxis_golden_percents_alpha_{alpha}_shots_{shot}.npy"
+            standard_file_name = f"results/fixedaxis_nongolden_percents_alpha_{alpha}_shots_{shot}.npy"
+
+            golden_distances_file = f"results/fixedaxis_golden_distances_alpha_{alpha}_shots_{shot}.npy"
+            nongolden_distances_file = f"results/fixedaxis_nongolden_distances_alpha_{alpha}_shots_{shot}.npy"
+            
+            # if any of those files doesn't exist, create them
             if not os.path.isfile(golden_file_name):
                 # Arrays to store the timing results
                 golden_vals = np.zeros([2])
@@ -123,14 +135,190 @@ def create_hypothesis_test_plot(n_trials):
             if not os.path.isfile(standard_file_name):
                 standard_vals = np.zeros([2])
                 np.save(standard_file_name, standard_vals)
+            if not os.path.isfile(golden_distances_file):
+                # Arrays to store the timing results
+                golden_dists = np.zeros([n_trials])
+                np.save(golden_distances_file, golden_dists)
+            if not os.path.isfile(nongolden_distances_file):
+                nongolden_dists = np.zeros([n_trials])
+                np.save(nongolden_distances_file, nongolden_dists)
 
             # load in saved values, allowing for stopping the program
             golden_vals = np.load(golden_file_name)
             nongolden_vals = np.load(standard_file_name)
-            
+            golden_dists = np.load(golden_distances_file)
+            nongolden_dists = np.load(nongolden_distances_file)
+
+            ic(alpha, shot, "golden")
             while golden_vals[1] < n_trials:
                 circ,subcirc1,subcirc2 = gen_random_circuit_specific_rotation("X", 2)
-                
+                # device = get_least_busy_real_device()
+                # pA, pB, correct = run_subcirc_axis_testing_batched(subcirc1, subcirc2, device, "X", alpha, shots=shot)
+                pA, pB, correct, _ = run_subcirc_hypo_test_axis(subcirc1, subcirc2, "X", alpha, simulator, shots=shot)
+                if correct:
+                    golden_vals[0] = golden_vals[0] + 1
+                golden_vals[1] = golden_vals[1] + 1
+                np.save(golden_file_name, golden_vals)
+
+                reconstructed = reconstruct_exact(pA,pB,subcirc1.width(),subcirc2.width())
+                # Run the full circuit on a simulator to get a "ground truth" result
+                sim_circ = transpile(circ, simulator)
+                job = simulator.run(sim_circ, shots=shot)
+                simulator_full_counts = job.result().get_counts()
+                # golden_dists[int(golden_vals[1])-1] = weighted_distance(reconstructed, simulator_full_counts)
+                golden_dists[int(golden_vals[1])-1] = l2_norm_distance(reconstructed, simulator_full_counts, 3)
+                np.save(golden_distances_file, golden_dists)
+
+
+            ic(alpha, shot, "nongolden")
+            while nongolden_vals[1] < n_trials:
+                circ,subcirc1,subcirc2 = gen_random_circuit_not_golden(2)
+                # device = get_least_busy_real_device()
+                # pA, pB, correct = run_subcirc_axis_testing_batched(subcirc1, subcirc2, device, "none", alpha, shots=shot)
+                pA, pB, correct, _ = run_subcirc_hypo_test_axis(subcirc1, subcirc2, "none", alpha, simulator, shots=shot)
+                if correct:
+                    nongolden_vals[0] = nongolden_vals[0] + 1
+                nongolden_vals[1] = nongolden_vals[1] + 1
+                np.save(standard_file_name, nongolden_vals)
+
+                reconstructed = reconstruct_exact(pA,pB,subcirc1.width(),subcirc2.width())
+                # Run the full circuit on a simulator to get a "ground truth" result
+                sim_circ = transpile(circ, simulator)
+                job = simulator.run(sim_circ, shots=shot)
+                simulator_full_counts = job.result().get_counts()
+                # nongolden_dists[int(nongolden_vals[1])-1] = weighted_distance(reconstructed, simulator_full_counts)
+                nongolden_dists[int(nongolden_vals[1])-1] = l2_norm_distance(reconstructed, simulator_full_counts, 3)
+                np.save(nongolden_distances_file, nongolden_dists)
+
+
+''' Function to take hypothesis testing data and plot how correct the
+    algorithm was at different shot numbers and alpha levels
+'''
+def create_hypothesis_test_plots(alphas, shots):
+
+    gold_y_values = np.zeros([len(shots), len(alphas)])
+    nongold_y_values = np.zeros([len(shots), len(alphas)])
+
+    for idx_a, alpha in enumerate(alphas):
+        for idx_s, shot in enumerate(shots):
+            # file names specifying information about this configuration
+            golden_file_name = f"results/fixedaxis_golden_percents_alpha_{alpha}_shots_{shot}.npy"
+            standard_file_name = f"results/fixedaxis_nongolden_percents_alpha_{alpha}_shots_{shot}.npy"
+
+            # load in saved values
+            golden_vals = np.load(golden_file_name)
+            nongolden_vals = np.load(standard_file_name)
+
+            gold_y_val = golden_vals[0] / golden_vals[1]
+            nongold_y_val = nongolden_vals[0] / nongolden_vals[1]
+
+            gold_y_values[idx_s, idx_a] = gold_y_val
+            nongold_y_values[idx_s, idx_a] = nongold_y_val
+
+    # Define the x-values
+    x_values = np.arange(len(shots))
+
+    # Define the colors for each alpha
+    colors = ['#BF616A', '#D08770', '#EBCB8B', '#A3BE8C', '#B48EAD']
+
+    # Create a figure and axis object
+    fig, ax = plt.subplots()
+
+    # Plot each line with a different color
+    for i, alpha in enumerate(alphas):
+        # y = nongold_y_values[:, i]
+        y = gold_y_values[:, i]
+        ax.plot(shots, y, color=colors[i], label=f'alpha={alpha}')
+    
+    plt.xscale('log')
+
+    # Add legend and labels
+    ax.legend()
+    ax.set_xlabel('Shots')
+    ax.set_ylabel('Correctly identified golden')
+
+    # Show the plot
+    plt.show()
+
+    # Create a figure and axis object
+    fig, ax = plt.subplots()
+
+    # Plot each line with a different color
+    for i, alpha in enumerate(alphas):
+        y = nongold_y_values[:, i]
+        ax.plot(shots, y, color=colors[i], label=f'alpha={alpha}')
+    
+    plt.xscale('log')
+
+    # Add legend and labels
+    ax.legend()
+    ax.set_xlabel('Shots')
+    ax.set_ylabel('Correctly identified nongolden')
+
+    # Show the plot
+    plt.show()
+
+
+def create_hypothesis_test_distance_plots(alphas, shots):
+
+    gold_y_values = np.zeros([len(shots), len(alphas)])
+    nongold_y_values = np.zeros([len(shots), len(alphas)])
+
+    for idx_a, alpha in enumerate(alphas):
+        for idx_s, shot in enumerate(shots):
+            # file names specifying information about this configuration
+            golden_file_name = f"results/fixedaxis_golden_distances_alpha_{alpha}_shots_{shot}.npy"
+            standard_file_name = f"results/fixedaxis_nongolden_distances_alpha_{alpha}_shots_{shot}.npy"
+
+            # load in saved values
+            golden_vals = np.load(golden_file_name)
+            nongolden_vals = np.load(standard_file_name)
+
+            gold_y_values[idx_s, idx_a] = np.average(golden_vals)
+            nongold_y_values[idx_s, idx_a] = np.average(nongolden_vals)
+
+    # Define the x-values
+    x_values = np.arange(len(shots))
+
+    # Define the colors for each alpha
+    colors = ['#BF616A', '#D08770', '#EBCB8B', '#A3BE8C', '#B48EAD']
+
+    # Create a figure and axis object
+    fig, ax = plt.subplots()
+
+    # Plot each line with a different color
+    for i, alpha in enumerate(alphas):
+        # y = nongold_y_values[:, i]
+        y = gold_y_values[:, i]
+        ax.plot(shots, y, color=colors[i], label=f'alpha={alpha}')
+    
+    plt.xscale('log')
+
+    # Add legend and labels
+    ax.legend()
+    ax.set_xlabel('Shots')
+    ax.set_ylabel('l2 distance (golden reconstruct)')
+
+    # Show the plot
+    plt.show()
+
+    # Create a figure and axis object
+    fig, ax = plt.subplots()
+
+    # Plot each line with a different color
+    for i, alpha in enumerate(alphas):
+        y = nongold_y_values[:, i]
+        ax.plot(shots, y, color=colors[i], label=f'alpha={alpha}')
+    
+    plt.xscale('log')
+
+    # Add legend and labels
+    ax.legend()
+    ax.set_xlabel('Shots')
+    ax.set_ylabel('l2 distance (nongolden reconstruct)')
+
+    # Show the plot
+    plt.show()
 
 
 ''' For a given axis (X,Y,Z) create subcircuits and a full circuit
@@ -366,18 +554,70 @@ def get_least_busy_real_device(qubits=0):
 
 
 def test_one():
-    circ,subcirc1,subcirc2 = gen_random_circuit_specific_rotation("X", 2)
-    # circ,subcirc1,subcirc2 = gen_random_circuit_not_golden(2)
-    device = get_least_busy_real_device()
-    pA, pB, val = run_subcirc_axis_testing_batched(subcirc1, subcirc2, "X", device, shots=1000)
+    for _ in range(10):
+        total = 0
+        for _ in range(10):
+            circ,subcirc1,subcirc2 = gen_random_circuit_specific_rotation("X", 2)
+            # device = get_least_busy_real_device()
+            pA, pB = run_subcirc_known_axis_batched_local(subcirc1, subcirc2, "X", shots=10000)
 
-    ic(val)
+            reconstructed = reconstruct_exact(pA,pB,subcirc1.width(),subcirc2.width())
+            # We get a simulator every time because we always need to get a "ground truth"
+            simulator = Aer.get_backend('aer_simulator')
+            # Run the full circuit on a simulator to get a "ground truth" result
+            sim_circ = transpile(circ, simulator)
+            job = simulator.run(sim_circ, shots=1000)
+            simulator_full_counts = job.result().get_counts()
+
+            pA, pB, correct = run_subcirc_axis_testing_local(subcirc1, subcirc2, "X", 0.001, shots=10000)
+            reconstructed_w_hypo_test = reconstruct_exact(pA,pB,subcirc1.width(),subcirc2.width())
+
+            # total += weighted_distance(reconstructed, simulator_full_counts)
+            total += l2_norm_distance(reconstructed_w_hypo_test, simulator_full_counts, 3)
+            # ic(l2_norm_distance(reconstructed_w_hypo_test, simulator_full_counts, 3))
+            # ic(l2_norm_distance(reconstructed, simulator_full_counts, 3))
+        ic(total / 10)
+
+def test_two():
+    circ,subcirc1,subcirc2 = gen_random_circuit_specific_rotation("X", 2)
+    # device = get_least_busy_real_device()
+    pA, pB, correct = run_subcirc_axis_testing_local(subcirc1, subcirc2, "X", 0.001, shots=10000)
+
+    reconstructed = reconstruct_exact(pA,pB,subcirc1.width(),subcirc2.width())
+    # We get a simulator every time because we always need to get a "ground truth"
+    simulator = Aer.get_backend('aer_simulator')
+    # Run the full circuit on a simulator to get a "ground truth" result
+    sim_circ = transpile(circ, simulator)
+    job = simulator.run(sim_circ, shots=1000)
+    simulator_full_counts = job.result().get_counts()
+
+    ic(weighted_distance(reconstructed, simulator_full_counts))
+    ic(l2_norm_distance(reconstructed, simulator_full_counts, 3))
+
+    keys_to_delete = []
+    for key, value in reconstructed.items():
+        if value == 0:
+            keys_to_delete.append(key)
+    for key in keys_to_delete:
+        del reconstructed[key]
+    
+    plot_histogram(reconstructed, title=f"reconstructed")
+    plot_histogram(simulator_full_counts, title=f"Simulated circuit")
+
+    plt.show()
+    
+
+alphas = [0.1, 0.01, 0.001]
+shots = [10, 50, 100, 500, 1000, 5000, 10000]
 
 # gen_random_circuit_specific_rotation("X", 3)
 # compare_golden_and_standard_fidelities(axis='X', shots=10000, run_on_real_device=True)
 # gen_random_circuit_not_golden(3)
-test_one()
-
+# test_one()
+# test_two()
+create_hypothesis_test_data(alphas, shots, 1000)
+create_hypothesis_test_plots(alphas, shots)
+create_hypothesis_test_distance_plots(alphas, shots)
 
 # compare_golden_and_standard_runtimes()
 # compare_golden_and_standard_runtimes(trials=1, max_size=2, shots=10, run_on_real_device=True)
