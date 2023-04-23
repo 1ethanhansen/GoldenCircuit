@@ -17,27 +17,6 @@ import scipy.stats as st
 
 
 
-''' we want to be able to
-    do this for multiple numbers of shots and levels of alpha:
-    0. create a circuit and know if it's golden or not
-    1. run the upstream circuits
-    2. decide whether to run the downstream circuit based on those values
-    3. evaluate whether it correctly identified golden/not
-
-    do this for multiples amounts of "delta" in a direction that makes it not quite golden
-    0. create a circuit and know if it's golden or not
-    1. add in a certain amount of "delta"
-    2. run the upstream circuits
-    3. decide whether to run the downstream circuit based on those values
-    4. run the downstream circuit (or not)
-    4. reconstruct
-    5. evaluate how high the fidelity was
-
-    steps that can be run as batched jobs: 0 and 1, 2 and 3 and 4
-'''
-
-
-
 ''' Create a circuit that definitely does *not* have a golden cutting point
 '''
 def gen_random_circuit_not_golden(subcirc_size=2):
@@ -199,6 +178,9 @@ def create_hypothesis_test_plots(alphas, shots):
     gold_y_values = np.zeros([len(shots), len(alphas)])
     nongold_y_values = np.zeros([len(shots), len(alphas)])
 
+    gold_error_bars = np.zeros([len(shots), len(alphas)])
+    nongold_error_bars = np.zeros([len(shots), len(alphas)])
+
     for idx_a, alpha in enumerate(alphas):
         for idx_s, shot in enumerate(shots):
             # file names specifying information about this configuration
@@ -211,6 +193,22 @@ def create_hypothesis_test_plots(alphas, shots):
 
             gold_y_val = golden_vals[0] / golden_vals[1]
             nongold_y_val = nongolden_vals[0] / nongolden_vals[1]
+
+            gold_standard_error = np.sqrt(gold_y_val*(1-gold_y_val)/golden_vals[1])
+            # ic(gold_y_val)
+            # ic(1-gold_y_val)
+            # ic(gold_y_val*(1-gold_y_val))
+            # ic(gold_y_val*(1-gold_y_val)/golden_vals[1])
+            # ic(np.sqrt(gold_y_val*(1-gold_y_val)/golden_vals[1]))
+            # ic(gold_standard_error)
+            overall_interval = st.t.interval(confidence=0.95, df=golden_vals[1]-1, loc=gold_y_val, scale=gold_standard_error)
+            plus_minus = (overall_interval[1] - overall_interval[0]) / 2
+            gold_error_bars[idx_s, idx_a] = plus_minus
+
+            nongold_standard_error = np.sqrt(nongold_y_val*(1-nongold_y_val)/nongolden_vals[1])
+            overall_interval = st.t.interval(confidence=0.95, df=nongolden_vals[1]-1, loc=nongold_y_val, scale=nongold_standard_error)
+            plus_minus = (overall_interval[1] - overall_interval[0]) / 2
+            nongold_error_bars[idx_s, idx_a] = plus_minus
 
             gold_y_values[idx_s, idx_a] = gold_y_val
             nongold_y_values[idx_s, idx_a] = nongold_y_val
@@ -228,7 +226,8 @@ def create_hypothesis_test_plots(alphas, shots):
     for i, alpha in enumerate(alphas):
         # y = nongold_y_values[:, i]
         y = gold_y_values[:, i]
-        ax.plot(shots, y, color=colors[i], label=f'alpha={alpha}')
+        y_err = gold_error_bars[:, i]
+        ax.errorbar(shots, y, yerr=y_err, capsize=5, color=colors[i], label=f'alpha={alpha}')
     
     plt.xscale('log')
 
@@ -246,7 +245,8 @@ def create_hypothesis_test_plots(alphas, shots):
     # Plot each line with a different color
     for i, alpha in enumerate(alphas):
         y = nongold_y_values[:, i]
-        ax.plot(shots, y, color=colors[i], label=f'alpha={alpha}')
+        y_err = nongold_error_bars[:, i]
+        ax.errorbar(shots, y, yerr=y_err, capsize=5, color=colors[i], label=f'alpha={alpha}')
     
     plt.xscale('log')
 
@@ -607,15 +607,17 @@ def test_two():
     plt.show()
     
 
-alphas = [0.1, 0.01, 0.001]
-shots = [10, 50, 100, 500, 1000, 5000, 10000]
+# alphas = [0.1, 0.01, 0.001]
+# shots = [10, 50, 100, 500, 1000, 5000, 10000]
+alphas = [0.01]
+shots = [100]
 
 # gen_random_circuit_specific_rotation("X", 3)
 # compare_golden_and_standard_fidelities(axis='X', shots=10000, run_on_real_device=True)
 # gen_random_circuit_not_golden(3)
 # test_one()
 # test_two()
-create_hypothesis_test_data(alphas, shots, 1000)
+create_hypothesis_test_data(alphas, shots, 100)
 create_hypothesis_test_plots(alphas, shots)
 create_hypothesis_test_distance_plots(alphas, shots)
 
