@@ -111,7 +111,7 @@ def get_vals_for_hypothesis_test_local(results, nA, shots):
         bitstring_probabilities = np.zeros([2**nA]) # $\hat{p}_S$
         for dec_num in range(2**nA):
             # make sure we have all bitstrings in our counts
-            bin_num = format(dec_num, '02b')
+            bin_num = format(dec_num, f'0{nA}b')
             if bin_num not in counts.keys():
                 bitstring_probabilities[dec_num] = 0
             else:
@@ -172,7 +172,7 @@ def run_subcirc(subcirc1, subcirc2, device, shots=10000):
 
         circ = transpile(subcirc1_, device)
         job = device.run(circ,shots=shots)
-        ic("pA", job.job_id())
+        # ic("pA", job.job_id())
         counts = job.result().get_counts(circ)
         # Get the total time actually spent running the circuit and add to total
         if not device.configuration().simulator:
@@ -208,7 +208,7 @@ def run_subcirc(subcirc1, subcirc2, device, shots=10000):
 
             circ = transpile(subcirc2_, device)
             job = device.run(circ,shots=shots)
-            ic("pB", job.job_id())
+            # ic("pB", job.job_id())
             counts = job.result().get_counts(circ)
             # Get the total time actually spent running the circuit and add to total
             if not device.configuration().simulator:
@@ -619,6 +619,43 @@ def run_subcirc_hypo_test_axis(subcirc1, subcirc2, correct_golden, level, device
         total_time = end_time - start_time
     
     return pA, pB, got_it_correct, total_time
+
+''' Given an upstream circuit, decide which (if any) axis is golden
+'''
+def upstream_subcirc_to_golden_axis(subcirc1, level, device, shots=10000):
+    # Get the number of qubits in subcircuit
+    nA = subcirc1.width()
+
+    # Get the bases we need to measure in
+    # For example if we only rotate in the X axis, then
+    # we should need to measure in the Y and Z axes
+    alpha = ['X','Y','Z']
+
+    upstream_results = []
+
+    for x in alpha:
+        subcirc1_ = QuantumCircuit(nA).compose(subcirc1)
+        beta = 2
+        if x == 'X':
+            beta = 0
+            subcirc1_.h(nA-1)
+        elif x == 'Y':
+            beta = 1
+            subcirc1_.sdg(nA-1)
+            subcirc1_.h(nA-1)
+        subcirc1_.measure_all()
+
+        circ = transpile(subcirc1_, device)
+        job = device.run(circ,shots=shots)
+        # ic("pA", job.job_id())
+        counts = job.result().get_counts(circ)
+        upstream_results.append(counts)
+
+    axis_estimates, axis_stddevs = get_vals_for_hypothesis_test_local(upstream_results, nA, shots)
+
+    golden_axis = results_imply_golden(axis_estimates, axis_stddevs, level)
+
+    return golden_axis
 
 
 ''' Given a subcirc1 which only rotates on a given axis,

@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 
 from reconstruct import *
 from distances import *
+from generate import *
+from plotting import *
 from qiskit.circuit.random import random_circuit
 from qiskit.visualization import plot_histogram
 from qiskit import QuantumCircuit, Aer, transpile
@@ -17,94 +19,21 @@ import scipy.stats as st
 
 
 
-''' Create a circuit that definitely does *not* have a golden cutting point
-'''
-def gen_random_circuit_not_golden(subcirc_size=2):
-    # create some random gates for the upstream circuit
-    # subcirc1 = random_circuit(subcirc_size, subcirc_size)
-    subcirc1 = QuantumCircuit(subcirc_size)
-
-    # make sure the last qubit in upstream circuit is not a golden cutting point
-    # theta = random.uniform(0.1, 1.5)
-    theta = 0.5
-    subcirc1.rx(theta, subcirc_size-1)
-    subcirc1.ry(theta, subcirc_size-1)
-    # subcirc1.rz(theta, subcirc_size-1)
-
-    subcirc1.rx(theta, 0)
-    subcirc1.ry(theta, 0)
-
-    # create the random downstream circuit
-    subcirc2 = random_circuit(subcirc_size, subcirc_size)
-
-    # create the full circuit
-    fullcirc = QuantumCircuit(subcirc_size*2 - 1)
-    fullcirc.compose(subcirc1, inplace=True)
-    fullcirc.compose(subcirc2, qubits=[i for i in range(subcirc_size-1, subcirc_size*2-1)], inplace=True)
-    fullcirc.measure_all()
-
-    # print(subcirc1)
-    # print(subcirc2)
-    # print(fullcirc)
-
-    return fullcirc, subcirc1, subcirc2
-
-''' Create a random circuit where only 1 axis of the bloch
-    sphere on the first qubit is rotated so only 2 measurements
-    must be done later
-
-    axis: the axis to rotate about
-    subcirc_size: number of qubits in each subcircuit
-'''
-def gen_random_circuit_specific_rotation(axis, subcirc_size=2):
-    # First half of our circuit (qubits 0 and 1)
-    subcirc1 = QuantumCircuit(subcirc_size)
-    # Get the random value to rotate
-    # theta = random.uniform(0.1, 1.5)
-    theta = 0.5
-
-    # Rotate just along the axis we want
-    if axis == "X":
-        subcirc1.rx(theta, [i for i in range(0, subcirc_size)])
-        subcirc1.ry(theta, 0)
-    elif axis == "Y":
-        subcirc1.ry(theta, [i for i in range(0, subcirc_size)])
-        subcirc1.rx(theta, 1)
-
-    subcirc1_non_shared = random_circuit(subcirc_size-1, subcirc_size)
-    subcirc1.compose(subcirc1_non_shared, inplace=True)
-
-    # Create a random second half of the circuit
-    subcirc2 = random_circuit(subcirc_size, subcirc_size)
-
-    # create the full circuit
-    fullcirc = QuantumCircuit(subcirc_size*2 - 1)
-    fullcirc.compose(subcirc1, inplace=True)
-    fullcirc.compose(subcirc2, qubits=[i for i in range(subcirc_size-1, subcirc_size*2-1)], inplace=True)
-    fullcirc.measure_all()
-
-    # print(subcirc1)
-    # print(subcirc2)
-    # print(fullcirc)
-
-    return fullcirc, subcirc1, subcirc2
-
-
 ''' Function to do hypothesis testing with different alpha values and
     different numbers of shots
 '''
-def create_hypothesis_test_data(alphas, shots, n_trials=10):
+def create_hypothesis_test_accuracy_data(alphas, shots, n_trials=10):
 
     simulator = Aer.get_backend('aer_simulator')
 
     for alpha in alphas:
         for shot in shots:
             # file names specifying information about this configuration
-            golden_file_name = f"results/fixedaxis_golden_percents_alpha_{alpha}_shots_{shot}.npy"
-            standard_file_name = f"results/fixedaxis_nongolden_percents_alpha_{alpha}_shots_{shot}.npy"
+            golden_file_name = f"results/percents_golden_alpha_{alpha}_shots_{shot}.npy"
+            standard_file_name = f"results/percents_nongolden_alpha_{alpha}_shots_{shot}.npy"
 
-            golden_distances_file = f"results/fixedaxis_golden_distances_alpha_{alpha}_shots_{shot}.npy"
-            nongolden_distances_file = f"results/fixedaxis_nongolden_distances_alpha_{alpha}_shots_{shot}.npy"
+            golden_distances_file = f"results/distances_golden_alpha_{alpha}_shots_{shot}.npy"
+            nongolden_distances_file = f"results/distances_nongolden_alpha_{alpha}_shots_{shot}.npy"
             
             # if any of those files doesn't exist, create them
             if not os.path.isfile(golden_file_name):
@@ -142,7 +71,7 @@ def create_hypothesis_test_data(alphas, shots, n_trials=10):
                 reconstructed = reconstruct_exact(pA,pB,subcirc1.width(),subcirc2.width())
                 # Run the full circuit on a simulator to get a "ground truth" result
                 sim_circ = transpile(circ, simulator)
-                job = simulator.run(sim_circ, shots=shot)
+                job = simulator.run(sim_circ, shots=10000)
                 simulator_full_counts = job.result().get_counts()
                 # golden_dists[int(golden_vals[1])-1] = weighted_distance(reconstructed, simulator_full_counts)
                 golden_dists[int(golden_vals[1])-1] = l2_norm_distance(reconstructed, simulator_full_counts, 3)
@@ -163,163 +92,110 @@ def create_hypothesis_test_data(alphas, shots, n_trials=10):
                 reconstructed = reconstruct_exact(pA,pB,subcirc1.width(),subcirc2.width())
                 # Run the full circuit on a simulator to get a "ground truth" result
                 sim_circ = transpile(circ, simulator)
-                job = simulator.run(sim_circ, shots=shot)
+                job = simulator.run(sim_circ, shots=10000)
                 simulator_full_counts = job.result().get_counts()
                 # nongolden_dists[int(nongolden_vals[1])-1] = weighted_distance(reconstructed, simulator_full_counts)
                 nongolden_dists[int(nongolden_vals[1])-1] = l2_norm_distance(reconstructed, simulator_full_counts, 3)
                 np.save(nongolden_distances_file, nongolden_dists)
 
 
-''' Function to take hypothesis testing data and plot how correct the
-    algorithm was at different shot numbers and alpha levels
+''' Get the data on how long it takes to run the hypothesis test
+    and reconstruct vs how long it takes without any hypothesis test
 '''
-def create_hypothesis_test_plots(alphas, shots):
+def create_hypothesis_test_time_data(alphas, n_trials=100):
+    simulator = Aer.get_backend('aer_simulator')
 
-    gold_y_values = np.zeros([len(shots), len(alphas)])
-    nongold_y_values = np.zeros([len(shots), len(alphas)])
+    for alpha in alphas:
+        ic(alpha)
+        # file names specifying information about this configuration
+        golden_file_name = f"results/golden_times_alpha_{alpha}.npy"
+        standard_file_name = f"results/nongolden_times_alpha_{alpha}.npy"
 
-    gold_error_bars = np.zeros([len(shots), len(alphas)])
-    nongold_error_bars = np.zeros([len(shots), len(alphas)])
+        # if any of those files doesn't exist, create them
+        if not os.path.isfile(golden_file_name):
+            # Arrays to store the timing results
+            golden_vals = np.zeros([n_trials])
+            np.save(golden_file_name, golden_vals)
+        if not os.path.isfile(standard_file_name):
+            standard_vals = np.zeros([n_trials])
+            np.save(standard_file_name, standard_vals)
 
-    for idx_a, alpha in enumerate(alphas):
-        for idx_s, shot in enumerate(shots):
+        # load in saved values, allowing for stopping the program
+        golden_vals = np.load(golden_file_name)
+        standard_vals = np.load(standard_file_name)
+
+        while len(np.where(golden_vals == 0)[0]) != 0:
+            idx = np.where(golden_vals == 0)[0][0]
+            # ic(idx)
+            # do our hypothesis testing first
+            circ,subcirc1,subcirc2 = gen_random_circuit_specific_rotation("X", 2)
+            pA, pB, correct, run_time = run_subcirc_hypo_test_axis(subcirc1, subcirc2, "X", alpha, simulator, shots=10000)
+            start_time = time.time()
+            reconstructed = reconstruct_exact(pA,pB,subcirc1.width(),subcirc2.width())
+            end_time = time.time()
+            total_time = end_time - start_time
+            total_time += run_time
+            golden_vals[idx] = total_time
+            # ic(golden_vals[idx])
+            np.save(golden_file_name, golden_vals)
+
+            # now do it without hypothesis testing
+            pA, pB, run_time = run_subcirc(subcirc1, subcirc2, simulator, shots=10000)
+            start_time = time.time()
+            reconstructed = reconstruct_exact(pA,pB,subcirc1.width(),subcirc2.width())
+            end_time = time.time()
+            total_time = end_time - start_time
+            total_time += run_time
+            standard_vals[idx] = total_time
+            # ic(standard_vals[idx])
+            np.save(standard_file_name, standard_vals)
+
+''' Get data on what proportion of completely randomly generated
+    circuits are golden at different alpha levels
+'''
+def create_prop_of_random_golden_data(alphas, depths, n_trials=100):
+    simulator = Aer.get_backend('aer_simulator')
+
+    for alpha in alphas:
+        for depth in depths:
+            ic(alpha, depth)
             # file names specifying information about this configuration
-            golden_file_name = f"results/fixedaxis_golden_percents_alpha_{alpha}_shots_{shot}.npy"
-            standard_file_name = f"results/fixedaxis_nongolden_percents_alpha_{alpha}_shots_{shot}.npy"
+            data_file_name = f"results/prop_data_alpha_{alpha}_depth_{depth}.npy"
 
-            # load in saved values
-            golden_vals = np.load(golden_file_name)
-            nongolden_vals = np.load(standard_file_name)
+            # if any of those files doesn't exist, create them
+            if not os.path.isfile(data_file_name):
+                # Arrays to store the timing results
+                prop_vals = np.zeros([2])
+                np.save(data_file_name, prop_vals)
 
-            gold_y_val = golden_vals[0] / golden_vals[1]
-            nongold_y_val = nongolden_vals[0] / nongolden_vals[1]
+            # load in saved values, allowing for stopping the program
+            prop_vals = np.load(data_file_name)
 
-            gold_standard_error = np.sqrt(gold_y_val*(1-gold_y_val)/golden_vals[1])
-            # ic(gold_y_val)
-            # ic(1-gold_y_val)
-            # ic(gold_y_val*(1-gold_y_val))
-            # ic(gold_y_val*(1-gold_y_val)/golden_vals[1])
-            # ic(np.sqrt(gold_y_val*(1-gold_y_val)/golden_vals[1]))
-            # ic(gold_standard_error)
-            overall_interval = st.t.interval(confidence=0.95, df=golden_vals[1]-1, loc=gold_y_val, scale=gold_standard_error)
-            plus_minus = (overall_interval[1] - overall_interval[0]) / 2
-            gold_error_bars[idx_s, idx_a] = plus_minus
+            while prop_vals[1] < n_trials:
+                # do our hypothesis testing on the circuit, no need to reconstruct
+                _,subcirc1,_ = gen_completely_random_circuit(2, depth)
+                found_axis = upstream_subcirc_to_golden_axis(subcirc1, alpha, simulator, shots=10000)
+                if found_axis != -1:
+                    prop_vals[0] = prop_vals[0] + 1
+                prop_vals[1] = prop_vals[1] + 1
+                np.save(data_file_name, prop_vals)
+            ic(prop_vals[0] / prop_vals[1])
 
-            nongold_standard_error = np.sqrt(nongold_y_val*(1-nongold_y_val)/nongolden_vals[1])
-            overall_interval = st.t.interval(confidence=0.95, df=nongolden_vals[1]-1, loc=nongold_y_val, scale=nongold_standard_error)
-            plus_minus = (overall_interval[1] - overall_interval[0]) / 2
-            nongold_error_bars[idx_s, idx_a] = plus_minus
+def test_multiple_benchmark_circuits(alphas, n_trials=10, subcirc_size=2, shots=10000):
+    circuit_types = {
+        "GHZ": gen_GHZ_cut(subcirc_size),
+    }
 
-            gold_y_values[idx_s, idx_a] = gold_y_val
-            nongold_y_values[idx_s, idx_a] = nongold_y_val
+    simulator = Aer.get_backend('aer_simulator')
 
-    # Define the x-values
-    x_values = np.arange(len(shots))
-
-    # Define the colors for each alpha
-    colors = ['#BF616A', '#D08770', '#EBCB8B', '#A3BE8C', '#B48EAD']
-
-    # Create a figure and axis object
-    fig, ax = plt.subplots()
-
-    # Plot each line with a different color
-    for i, alpha in enumerate(alphas):
-        # y = nongold_y_values[:, i]
-        y = gold_y_values[:, i]
-        y_err = gold_error_bars[:, i]
-        ax.errorbar(shots, y, yerr=y_err, capsize=5, color=colors[i], label=f'alpha={alpha}')
-    
-    plt.xscale('log')
-
-    # Add legend and labels
-    ax.legend()
-    ax.set_xlabel('Shots')
-    ax.set_ylabel('Correctly identified golden')
-
-    # Show the plot
-    plt.show()
-
-    # Create a figure and axis object
-    fig, ax = plt.subplots()
-
-    # Plot each line with a different color
-    for i, alpha in enumerate(alphas):
-        y = nongold_y_values[:, i]
-        y_err = nongold_error_bars[:, i]
-        ax.errorbar(shots, y, yerr=y_err, capsize=5, color=colors[i], label=f'alpha={alpha}')
-    
-    plt.xscale('log')
-
-    # Add legend and labels
-    ax.legend()
-    ax.set_xlabel('Shots')
-    ax.set_ylabel('Correctly identified nongolden')
-
-    # Show the plot
-    plt.show()
-
-
-def create_hypothesis_test_distance_plots(alphas, shots):
-
-    gold_y_values = np.zeros([len(shots), len(alphas)])
-    nongold_y_values = np.zeros([len(shots), len(alphas)])
-
-    for idx_a, alpha in enumerate(alphas):
-        for idx_s, shot in enumerate(shots):
-            # file names specifying information about this configuration
-            golden_file_name = f"results/fixedaxis_golden_distances_alpha_{alpha}_shots_{shot}.npy"
-            standard_file_name = f"results/fixedaxis_nongolden_distances_alpha_{alpha}_shots_{shot}.npy"
-
-            # load in saved values
-            golden_vals = np.load(golden_file_name)
-            nongolden_vals = np.load(standard_file_name)
-
-            gold_y_values[idx_s, idx_a] = np.average(golden_vals)
-            nongold_y_values[idx_s, idx_a] = np.average(nongolden_vals)
-
-    # Define the x-values
-    x_values = np.arange(len(shots))
-
-    # Define the colors for each alpha
-    colors = ['#BF616A', '#D08770', '#EBCB8B', '#A3BE8C', '#B48EAD']
-
-    # Create a figure and axis object
-    fig, ax = plt.subplots()
-
-    # Plot each line with a different color
-    for i, alpha in enumerate(alphas):
-        # y = nongold_y_values[:, i]
-        y = gold_y_values[:, i]
-        ax.plot(shots, y, color=colors[i], label=f'alpha={alpha}')
-    
-    plt.xscale('log')
-
-    # Add legend and labels
-    ax.legend()
-    ax.set_xlabel('Shots')
-    ax.set_ylabel('l2 distance (golden reconstruct)')
-
-    # Show the plot
-    plt.show()
-
-    # Create a figure and axis object
-    fig, ax = plt.subplots()
-
-    # Plot each line with a different color
-    for i, alpha in enumerate(alphas):
-        y = nongold_y_values[:, i]
-        ax.plot(shots, y, color=colors[i], label=f'alpha={alpha}')
-    
-    plt.xscale('log')
-
-    # Add legend and labels
-    ax.legend()
-    ax.set_xlabel('Shots')
-    ax.set_ylabel('l2 distance (nongolden reconstruct)')
-
-    # Show the plot
-    plt.show()
-
+    for name, circs in circuit_types.items():
+        for alpha in alphas:
+            total = 0
+            for i in range(n_trials):
+                found_axis = upstream_subcirc_to_golden_axis(circs[1], alpha, simulator, shots=shots)
+                if found_axis != -1:
+                    total += 1
+            print(f"At alpha={alpha}, {name} was found golden {total} out of {n_trials} times")
 
 ''' For a given axis (X,Y,Z) create subcircuits and a full circuit
     to compare the reconstruction method with a run of the full
@@ -607,19 +483,27 @@ def test_two():
     plt.show()
     
 
-# alphas = [0.1, 0.01, 0.001]
-# shots = [10, 50, 100, 500, 1000, 5000, 10000]
-alphas = [0.01]
-shots = [100]
+alphas = [0.1, 0.01, 0.001]
+shots = [10, 50, 100, 500, 1000, 5000, 10000]
+depths = [i for i in range(1, 11)]
+# alphas = [0.01]
+# shots = [100]
 
 # gen_random_circuit_specific_rotation("X", 3)
 # compare_golden_and_standard_fidelities(axis='X', shots=10000, run_on_real_device=True)
 # gen_random_circuit_not_golden(3)
 # test_one()
 # test_two()
-create_hypothesis_test_data(alphas, shots, 100)
-create_hypothesis_test_plots(alphas, shots)
-create_hypothesis_test_distance_plots(alphas, shots)
+# gen_GHZ_cut(3)
+test_multiple_benchmark_circuits(alphas,10, 3, 1000)
+
+# create_hypothesis_test_accuracy_data(alphas, shots, 1000)
+# create_hypothesis_test_accuracy_plots(alphas, shots)
+# create_hypothesis_test_distance_plots(alphas, shots)
+# create_hypothesis_test_time_data(alphas, n_trials=1000)
+# create_hypothesis_test_time_plot(alphas)
+# create_prop_of_random_golden_data(alphas, depths, n_trials=1000)
+# create_prop_of_random_golden_plots(alphas, depths)
 
 # compare_golden_and_standard_runtimes()
 # compare_golden_and_standard_runtimes(trials=1, max_size=2, shots=10, run_on_real_device=True)
