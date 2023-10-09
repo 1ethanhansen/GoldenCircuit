@@ -4,13 +4,16 @@ from reconstruct import *
 from distances import *
 from generate import *
 from plotting import *
+from main import *
 from qiskit.circuit.random import random_circuit
 from qiskit.visualization import plot_histogram
 from qiskit import QuantumCircuit, Aer, transpile
 from qiskit import IBMQ
+from qiskit_aer import AerSimulator
+from qiskit_aer.noise import NoiseModel
 from qiskit.providers.ibmq import least_busy
 from icecream import ic
-from main import *
+from math import isnan
 import time
 import random
 import os.path
@@ -60,21 +63,27 @@ def create_hypothesis_test_accuracy_data(alphas, shots, n_trials=10):
             ic(alpha, shot, "golden")
             while golden_vals[1] < n_trials:
                 circ,subcirc1,subcirc2 = gen_random_circuit_specific_rotation("X", 2)
-                # device = get_least_busy_real_device()
-                # pA, pB, correct = run_subcirc_axis_testing_batched(subcirc1, subcirc2, device, "X", alpha, shots=shot)
                 pA, pB, correct, _ = run_subcirc_hypo_test_axis(subcirc1, subcirc2, "X", alpha, simulator, shots=shot)
-                if correct:
-                    golden_vals[0] = golden_vals[0] + 1
-                golden_vals[1] = golden_vals[1] + 1
-                np.save(golden_file_name, golden_vals)
 
                 reconstructed = reconstruct_exact(pA,pB,subcirc1.width(),subcirc2.width())
                 # Run the full circuit on a simulator to get a "ground truth" result
                 sim_circ = transpile(circ, simulator)
                 job = simulator.run(sim_circ, shots=10000)
                 simulator_full_counts = job.result().get_counts()
-                # golden_dists[int(golden_vals[1])-1] = weighted_distance(reconstructed, simulator_full_counts)
-                golden_dists[int(golden_vals[1])-1] = l2_norm_distance(reconstructed, simulator_full_counts, 3)
+                # dist = weighted_distance(reconstructed, simulator_full_counts)
+                dist = l2_norm_distance(reconstructed, simulator_full_counts, 3)
+                
+                # Sanity check, sometimes a bit flips or something
+                if isnan(dist):
+                    ic(golden_vals[1], alpha, shot)
+                    continue
+
+                if correct:
+                    golden_vals[0] = golden_vals[0] + 1
+                golden_vals[1] = golden_vals[1] + 1
+                np.save(golden_file_name, golden_vals)
+
+                golden_dists[int(golden_vals[1])-1] = dist
                 np.save(golden_distances_file, golden_dists)
 
 
@@ -84,18 +93,25 @@ def create_hypothesis_test_accuracy_data(alphas, shots, n_trials=10):
                 # device = get_least_busy_real_device()
                 # pA, pB, correct = run_subcirc_axis_testing_batched(subcirc1, subcirc2, device, "none", alpha, shots=shot)
                 pA, pB, correct, _ = run_subcirc_hypo_test_axis(subcirc1, subcirc2, "none", alpha, simulator, shots=shot)
-                if correct:
-                    nongolden_vals[0] = nongolden_vals[0] + 1
-                nongolden_vals[1] = nongolden_vals[1] + 1
-                np.save(standard_file_name, nongolden_vals)
 
                 reconstructed = reconstruct_exact(pA,pB,subcirc1.width(),subcirc2.width())
                 # Run the full circuit on a simulator to get a "ground truth" result
                 sim_circ = transpile(circ, simulator)
                 job = simulator.run(sim_circ, shots=10000)
                 simulator_full_counts = job.result().get_counts()
-                # nongolden_dists[int(nongolden_vals[1])-1] = weighted_distance(reconstructed, simulator_full_counts)
-                nongolden_dists[int(nongolden_vals[1])-1] = l2_norm_distance(reconstructed, simulator_full_counts, 3)
+                # dist = weighted_distance(reconstructed, simulator_full_counts)
+                dist = l2_norm_distance(reconstructed, simulator_full_counts, 3)
+
+                if isnan(dist):
+                    ic(nongolden_vals[1], alpha, shot)
+                    continue
+
+                if correct:
+                    nongolden_vals[0] = nongolden_vals[0] + 1
+                nongolden_vals[1] = nongolden_vals[1] + 1
+                np.save(standard_file_name, nongolden_vals)
+
+                nongolden_dists[int(nongolden_vals[1])-1] = dist
                 np.save(nongolden_distances_file, nongolden_dists)
 
 
@@ -415,16 +431,19 @@ def analyze_runtime_arrays(golden_file_name, standard_file_name):
 
 def get_least_busy_real_device(qubits=0):
     IBMQ.load_account()
+    print("loaded")
     provider = IBMQ.get_provider(hub='ibm-q')
+    ic(provider)
     if qubits == 0:
         real_devices = provider.backends(filters=lambda x: not x.configuration().simulator)
     else:
         real_devices = provider.backends(filters=lambda x: not x.configuration().simulator and x.configuration().n_qubits == qubits)
     device = least_busy(real_devices)
+    ic(device)
     # device = provider.get_backend('ibmq_lima')
     # device = provider.get_backend('ibm_nairobi')
     # device = provider.get_backend('ibmq_quito')
-    device = provider.get_backend('simulator_statevector')
+    # device = provider.get_backend('simulator_statevector')
 
     return device
 
@@ -483,9 +502,9 @@ def test_two():
     plt.show()
     
 
-alphas = [0.1, 0.01, 0.001]
-shots = [10, 50, 100, 500, 1000, 5000, 10000]
-depths = [i for i in range(1, 11)]
+# alphas = [0.1, 0.01, 0.001]
+# shots = [10, 50, 100, 500, 1000, 5000, 10000]
+# depths = [i for i in range(1, 11)]
 # alphas = [0.01]
 # shots = [100]
 
@@ -495,18 +514,60 @@ depths = [i for i in range(1, 11)]
 # test_one()
 # test_two()
 # gen_GHZ_cut(3)
-test_multiple_benchmark_circuits(alphas,10, 3, 1000)
+
 
 # create_hypothesis_test_accuracy_data(alphas, shots, 1000)
 # create_hypothesis_test_accuracy_plots(alphas, shots)
 # create_hypothesis_test_distance_plots(alphas, shots)
 # create_hypothesis_test_time_data(alphas, n_trials=1000)
-# create_hypothesis_test_time_plot(alphas)
 # create_prop_of_random_golden_data(alphas, depths, n_trials=1000)
+# test_multiple_benchmark_circuits(alphas,10, 3, 1000)
+# create_hypothesis_test_time_plot(alphas)
 # create_prop_of_random_golden_plots(alphas, depths)
+# create_big_subplots(alphas, shots)
 
 # compare_golden_and_standard_runtimes()
 # compare_golden_and_standard_runtimes(trials=1, max_size=2, shots=10, run_on_real_device=True)
 # compare_golden_and_standard_runtimes(trials=50, max_size=2, shots=1000, run_on_real_device=True)
 
 # analyze_runtime_arrays("results/golden_times_50_trials_3_size_1000_shots_True_real.npy", "results/standard_times_50_trials_3_size_1000_shots_True_real.npy")
+
+
+circuit = QuantumCircuit(5)
+circuit.h(0)
+circuit.cnot(0, 1)
+circuit.cnot(1, 2)
+circuit.cnot(2, 3)
+circuit.cnot(3, 4)
+
+subcirc1 = QuantumCircuit(2)
+subcirc1.h(0)
+subcirc1.cnot(0, 1)
+
+subcirc2 = QuantumCircuit(4)
+subcirc2.cnot(0, 1)
+subcirc2.cnot(1, 2)
+subcirc2.cnot(2, 3)
+
+device = get_least_busy_real_device()
+noisy_sim = AerSimulator.from_backend(device)
+
+pA, pB, total_time = run_subcirc_golden_cut_all_axes(subcirc1, subcirc2, 0.0005, noisy_sim, shots=2000)
+ic("should have run on ibm")
+
+reconstructed_w_hypo_test = reconstruct_exact(pA,pB,subcirc1.width(),subcirc2.width())
+ic(reconstructed_w_hypo_test)
+
+circuit.measure_all()
+sim_circ = transpile(circuit, noisy_sim, optimization_level=0)
+print(sim_circ)
+job = noisy_sim.run(sim_circ, shots=2000)
+ic(job.result())
+full_counts = job.result().get_counts(0)
+ic(full_counts)
+
+expected_dist = {'00000': 0.5,
+                    '11111': 0.5}
+
+ic(l2_norm_distance(expected_dist, reconstructed_w_hypo_test, 5))
+ic(l2_norm_distance(expected_dist, full_counts, 5))

@@ -3,6 +3,135 @@ import numpy as np
 import scipy.stats as st
 from icecream import ic
 
+def create_big_subplots(alphas, shots):
+    gold_acc_values = np.zeros([len(shots), len(alphas)])
+    nongold_acc_values = np.zeros([len(shots), len(alphas)])
+
+    gold_acc_error_bars = np.zeros([len(shots), len(alphas)])
+    nongold_acc_error_bars = np.zeros([len(shots), len(alphas)])
+
+    gold_dist_values = np.zeros([len(shots), len(alphas)])
+    nongold_dist_values = np.zeros([len(shots), len(alphas)])
+
+    gold_dist_error_bars = np.zeros([len(shots), len(alphas)])
+    nongold_dist_error_bars = np.zeros([len(shots), len(alphas)])
+
+    for idx_a, alpha in enumerate(alphas):
+        for idx_s, shot in enumerate(shots):
+            # file names specifying information about this configuration
+            golden_acc_file_name = f"results/percents_golden_alpha_{alpha}_shots_{shot}.npy"
+            standard_acc_file_name = f"results/percents_nongolden_alpha_{alpha}_shots_{shot}.npy"
+
+            # load in saved values
+            golden_vals = np.load(golden_acc_file_name)
+            nongolden_vals = np.load(standard_acc_file_name)
+
+            gold_y_val = golden_vals[0] / golden_vals[1]
+            nongold_y_val = nongolden_vals[0] / nongolden_vals[1]
+
+            gold_standard_error = np.sqrt(gold_y_val*(1-gold_y_val)/golden_vals[1])
+            overall_interval = st.t.interval(confidence=0.95, df=golden_vals[1]-1, loc=gold_y_val, scale=gold_standard_error)
+            plus_minus = (overall_interval[1] - overall_interval[0]) / 2
+            gold_acc_error_bars[idx_s, idx_a] = plus_minus
+
+            nongold_standard_error = np.sqrt(nongold_y_val*(1-nongold_y_val)/nongolden_vals[1])
+            overall_interval = st.t.interval(confidence=0.95, df=nongolden_vals[1]-1, loc=nongold_y_val, scale=nongold_standard_error)
+            plus_minus = (overall_interval[1] - overall_interval[0]) / 2
+            nongold_acc_error_bars[idx_s, idx_a] = plus_minus
+
+            gold_acc_values[idx_s, idx_a] = gold_y_val
+            nongold_acc_values[idx_s, idx_a] = nongold_y_val
+            
+
+            golden_dist_file_name = f"results/distances_golden_alpha_{alpha}_shots_{shot}.npy"
+            standard_dist_file_name = f"results/distances_nongolden_alpha_{alpha}_shots_{shot}.npy"
+
+            # load in saved values
+            golden_vals = np.load(golden_dist_file_name)
+            nongolden_vals = np.load(standard_dist_file_name)
+
+            gold_mean = np.average(golden_vals)
+            nongold_mean = np.average(nongolden_vals)
+
+            gold_dist_values[idx_s, idx_a] = gold_mean
+            nongold_dist_values[idx_s, idx_a] = nongold_mean
+
+            gold_standard_error = np.std(golden_vals, ddof=1) / np.sqrt(len(golden_vals))
+            overall_interval = st.t.interval(confidence=0.95, df=len(golden_vals)-1, loc=gold_mean, scale=gold_standard_error)
+            plus_minus = (overall_interval[1] - overall_interval[0]) / 2
+            gold_dist_error_bars[idx_s, idx_a] = plus_minus
+
+            nongold_standard_error = np.std(nongolden_vals, ddof=1) / np.sqrt(len(nongolden_vals))
+            overall_interval = st.t.interval(confidence=0.95, df=len(nongolden_vals)-1, loc=nongold_mean, scale=nongold_standard_error)
+            plus_minus = (overall_interval[1] - overall_interval[0]) / 2
+            nongold_dist_error_bars[idx_s, idx_a] = plus_minus
+
+    # Define the x-values
+    x_values = np.arange(len(shots))
+
+    # Define the colors for each alpha (comes from nord theme)
+    colors = ['#BF616A', '#A3BE8C', '#5E81AC']
+    markers = ['o', 's', '^']
+
+    fig, axs = plt.subplots(nrows=2, ncols=2, figsize=(10, 8), sharex='col')
+
+
+
+    # Plot each line with a different color
+    for i, alpha in enumerate(alphas):
+        # y = nongold_y_values[:, i]
+        y = gold_acc_values[:, i]
+        y_err = gold_acc_error_bars[:, i]
+        axs[0,0].errorbar(shots, y, yerr=y_err, capsize=5, color=colors[i], marker=markers[i])
+
+    # Plot each line with a different color
+    for i, alpha in enumerate(alphas):
+        # y = nongold_y_values[:, i]
+        y = nongold_acc_values[:, i]
+        y_err = nongold_acc_error_bars[:, i]
+        axs[0,1].errorbar(shots, y, yerr=y_err, capsize=5, color=colors[i], marker=markers[i], label=f'α={alpha}')
+
+    # Plot each line with a different color
+    for i, alpha in enumerate(alphas):
+        # y = nongold_y_values[:, i]
+        y = gold_dist_values[:, i]
+        y_err = gold_dist_error_bars[:, i]
+        axs[1,0].errorbar(shots, y, yerr=y_err, capsize=5, color=colors[i], marker=markers[i])
+
+    # Plot each line with a different color
+    for i, alpha in enumerate(alphas):
+        # y = nongold_y_values[:, i]
+        y = nongold_dist_values[:, i]
+        y_err = nongold_dist_error_bars[:, i]
+        axs[1,1].errorbar(shots, y, yerr=y_err, capsize=5, color=colors[i], marker=markers[i])
+
+    # Set the x-axis to log scale for all subplots
+    for ax in axs.flatten():
+        ax.set_xscale('log')
+
+    # Set the y-axis scale of subplot [1,1] to be the same as subplot [1,0]
+    axs[1,1].sharey(axs[1,0])
+
+    axs[0,1].legend()
+    axs[1,0].set_xlabel('Shots')
+    axs[1,1].set_xlabel('Shots')
+    axs[0,0].set_ylabel('Probability')
+    # axs[0,1].set_ylabel('Probability')
+    axs[1,0].set_ylabel(r'$\ell^2$ distance')
+    # axs[1,1].set_ylabel(r'$\ell^2$ distance')
+
+    axs[0, 0].text(0, 1.05, 'A', transform=axs[0, 0].transAxes, size=20)
+    axs[0, 1].text(0, 1.05, 'B', transform=axs[0, 1].transAxes, size=20)
+    axs[1, 0].text(0, 1.05, 'C', transform=axs[1, 0].transAxes, size=20)
+    axs[1, 1].text(0, 1.05, 'D', transform=axs[1, 1].transAxes, size=20)
+
+    # Create a legend object and place it outside the subplots
+    # fig.legend(loc='center left', bbox_to_anchor=(0.88, 0.5))
+
+    plt.show()
+
+
+
 ''' Function to take hypothesis testing data and plot how correct the
     algorithm was at different shot numbers and alpha levels
 '''
@@ -45,6 +174,7 @@ def create_hypothesis_test_accuracy_plots(alphas, shots):
 
     # Define the colors for each alpha (comes from nord theme)
     colors = ['#BF616A', '#A3BE8C', '#5E81AC']
+    markers = ['o', 's', '^']
 
     # Create a figure and axis object
     fig, ax = plt.subplots()
@@ -54,7 +184,7 @@ def create_hypothesis_test_accuracy_plots(alphas, shots):
         # y = nongold_y_values[:, i]
         y = gold_y_values[:, i]
         y_err = gold_error_bars[:, i]
-        ax.errorbar(shots, y, yerr=y_err, capsize=5, color=colors[i], label=f'alpha={alpha}')
+        ax.errorbar(shots, y, yerr=y_err, capsize=5, color=colors[i], marker=markers[i], label=f'alpha={alpha}')
     
     plt.xscale('log')
 
@@ -125,6 +255,7 @@ def create_hypothesis_test_distance_plots(alphas, shots):
 
      # Define the colors for each alpha (comes from nord theme)
     colors = ['#BF616A', '#A3BE8C', '#5E81AC']
+    markers = ['o', 's', '^']
 
     # Create a figure and axis object
     fig, ax = plt.subplots()
@@ -133,7 +264,7 @@ def create_hypothesis_test_distance_plots(alphas, shots):
     for i, alpha in enumerate(alphas):
         y = gold_y_values[:, i]
         y_err = gold_error_bars[:, i]
-        ax.errorbar(shots, y, yerr=y_err, capsize=5, color=colors[i], label=f'alpha={alpha}')
+        ax.errorbar(shots, y, yerr=y_err, capsize=5, color=colors[i], marker=markers[i], label=f'alpha={alpha}')
     
     plt.xscale('log')
 
@@ -152,7 +283,7 @@ def create_hypothesis_test_distance_plots(alphas, shots):
     for i, alpha in enumerate(alphas):
         y = nongold_y_values[:, i]
         y_err = nongold_error_bars[:, i]
-        ax.errorbar(shots, y, yerr=y_err, capsize=5, color=colors[i], label=f'alpha={alpha}')
+        ax.errorbar(shots, y, yerr=y_err, capsize=5, color=colors[i], marker=markers[i], label=f'alpha={alpha}')
     
     plt.xscale('log')
 
@@ -197,6 +328,11 @@ def create_hypothesis_test_time_plot(alphas):
         plus_minus = (overall_interval[1] - overall_interval[0]) / 2
         standard_y_errs[idx] = plus_minus
 
+
+    # ic(testing_y_vals)
+    # ic(testing_y_errs)
+    # ic(standard_y_vals)
+    # ic(standard_y_errs)
     # Define the x-values
     x_values = np.arange(len(alphas))
 
@@ -215,7 +351,21 @@ def create_hypothesis_test_time_plot(alphas):
     ax.set_ylabel('time to complete reconstruction (s)')
 
     # Show the plot
-    plt.show()
+    # plt.show()
+
+    # create latex table
+    print("\\begin{tabular}{|c|c|c|c|}")
+    print("\\hline")
+    print("& \\multicolumn{3}{|c|}{$\\alpha$} \\\\")
+    print("\\cline{2-4}")
+    print("& 0.1 & 0.01 & 0.001 \\\\")
+    print("\\hline")
+    print("With testing (s) & {:.4f}$\\pm${:.4f} & {:.4f}$\\pm${:.4f} & {:.4f}$\\pm${:.4f} \\\\".format(testing_y_vals[0], testing_y_errs[0], testing_y_vals[1], testing_y_errs[1], testing_y_vals[2], testing_y_errs[2]))
+    print("\\hline")
+    print("Without testing (s) & {:.4f}$\\pm${:.4f} & {:.4f}$\\pm${:.4f} & {:.4f}$\\pm${:.4f} \\\\".format(standard_y_vals[0], standard_y_errs[0], standard_y_vals[1], standard_y_errs[1], standard_y_vals[2], standard_y_errs[2]))
+    print("\\hline")
+    print("\\end{tabular}")
+
 
 
 ''' Function to take hypothesis testing data and plot how many
@@ -249,6 +399,7 @@ def create_prop_of_random_golden_plots(alphas, depths):
 
     # Define the colors for each alpha (comes from nord theme)
     colors = ['#BF616A', '#A3BE8C', '#5E81AC']
+    markers = ['o', 's', '^']
 
     # Create a figure and axis object
     fig, ax = plt.subplots()
@@ -258,12 +409,12 @@ def create_prop_of_random_golden_plots(alphas, depths):
         # y = nongold_y_values[:, i]
         y = prop_y_values[:, i]
         y_err = prop_error_bars[:, i]
-        ax.errorbar(depths, y, yerr=y_err, capsize=5, color=colors[i], label=f'alpha={alpha}')
+        ax.errorbar(depths, y, yerr=y_err, capsize=5, color=colors[i], marker=markers[i], label=f'α={alpha}')
 
     # Add legend and labels
     ax.legend()
-    ax.set_xlabel('Depth of upstream subcircuit')
-    ax.set_ylabel('Proportion identified as golden')
+    ax.set_xlabel('Depth')
+    ax.set_ylabel('Proportion')
 
     # Show the plot
     plt.show()

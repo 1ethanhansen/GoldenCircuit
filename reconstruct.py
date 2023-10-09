@@ -140,6 +140,15 @@ def results_imply_golden(taus, stddevs, level):
     return -1
 
 
+def results_imply_all_gold_axes(taus, stddevs, level):
+    axes = ['X', 'Y', 'Z']
+    golds = []
+    for i in range(len(taus)):
+        if taus[i] <= ndtri(1-level/2) * stddevs[i]:
+            golds.append(axes[i])
+    return golds
+
+
 def get_array_from_IBM_managed(raw_results, num):
     results = []
     for i in num:
@@ -619,6 +628,142 @@ def run_subcirc_hypo_test_axis(subcirc1, subcirc2, correct_golden, level, device
         total_time = end_time - start_time
     
     return pA, pB, got_it_correct, total_time
+
+
+""" Used for if we want to remove all possible golden axes """
+def run_subcirc_golden_cut_all_axes(subcirc1, subcirc2, level, device, shots=10000):
+    total_time = 0
+    start_time = time.time()
+    # Get the number of qubits in each subcircuit
+    nA = subcirc1.width()
+    nB = subcirc2.width()
+
+    # Get the bases we need to measure in
+    # For example if we only rotate in the X axis, then
+    # we should need to measure in the Y and Z axes
+    alpha = ['X','Y','Z']
+
+    pA = np.zeros(shape=[2**(nA-1),2,3])
+    pB = np.zeros(shape=[2**nB,2,3])
+
+    upstream_results = []
+
+    for x in alpha:
+        subcirc1_ = QuantumCircuit(nA).compose(subcirc1)
+        beta = 2
+        if x == 'X':
+            beta = 0
+            subcirc1_.h(nA-1)
+        elif x == 'Y':
+            beta = 1
+            subcirc1_.sdg(nA-1)
+            subcirc1_.h(nA-1)
+        subcirc1_.measure_all()
+
+        circ = transpile(subcirc1_, device)
+        # print(circ)
+        job = device.run(circ,shots=shots)
+        # ic(job.job_id())
+        # ic("pA", job.job_id())
+        counts = job.result().get_counts(circ)
+        ic(counts, x)
+        upstream_results.append(counts)
+        # Get the total time actually spent running the circuit and add to total
+        if not device.configuration().simulator:
+            total_time += job.result().time_taken
+
+        for n in range(2**nA,2**(nA+1)):
+            # ss = subcirc1.width()
+            bstr = bin(n)
+            string = bstr[3:len(bstr)]
+            ahat = int(bstr[3]) # tensor index
+            str_ind = int(bstr[4:len(bstr)],2) # tensor index
+
+            if string not in counts:
+                pA[str_ind, ahat, beta] = 0
+            else:
+                pA[str_ind, ahat, beta] = counts[string]/shots
+
+    axis_estimates, axis_stddevs = get_vals_for_hypothesis_test_local(upstream_results, nA, shots)
+
+    golden_axes = results_imply_all_gold_axes(axis_estimates, axis_stddevs, level)
+
+    for golden_axis in golden_axes:
+        # beta = alpha.index(golden_axis)
+        # counts = upstream_results[beta]
+        # ic("before", counts)
+        # min_count_indices = []
+        # max_count_indices = []
+        # # find almost 0 and majority count indices for later
+        # for i, count in counts.items():
+        #     if count/shots <= 0.05:
+        #         min_count_indices.append(i)
+        #     elif count/shots > 0.5:
+        #         max_count_indices.append(i)
+
+        # # redistribute almost 0 to more probable locations
+        # for min_index in min_count_indices:
+        #     to_distribute = counts[min_index] / len(max_count_indices)
+        #     for max_index in max_count_indices:
+        #         counts[max_index] += to_distribute
+        #     counts[min_index] = 0
+
+        # ic("after", counts)
+
+        # zero-out small values
+        # for n in range(2**nA,2**(nA+1)):
+        #     # ss = subcirc1.width()
+        #     bstr = bin(n)
+        #     string = bstr[3:len(bstr)]
+        #     ahat = int(bstr[3]) # tensor index
+        #     str_ind = int(bstr[4:len(bstr)],2) # tensor index
+
+        #     pA[str_ind, ahat, beta] = counts[string]/shots
+
+        alpha.remove(golden_axis)
+    ic(golden_axes)
+    ic(alpha)
+
+    for x in alpha:
+        for e in [0, 1]:
+            init = QuantumCircuit(nB)
+            beta = 2
+            if e == 1:
+                init.x(0)
+            if x == 'X':
+                beta = 0
+                init.h(0)
+            elif x == 'Y':
+                beta = 1
+                init.h(0)
+                init.s(0)
+            subcirc2_ = init.compose(subcirc2)
+            subcirc2_.measure_all()
+
+            circ = transpile(subcirc2_, device)
+            print(circ)
+            job = device.run(circ,shots=shots)
+            # ic("pB", job.job_id())
+            counts = job.result().get_counts(circ)
+            # Get the total time actually spent running the circuit and add to total
+            if not device.configuration().simulator:
+                total_time += job.result().time_taken
+
+            for n in range(2**nB,2**(nB+1)):
+                bstr = bin(n)
+                string = bstr[3:len(bstr)]
+                str_ind = int(string,2)
+
+                if string not in counts:
+                    pB[str_ind, e, beta] = 0
+                else:
+                    pB[str_ind, e, beta] = counts[string]/shots
+    end_time = time.time()
+
+    if device.configuration().simulator:
+        total_time = end_time - start_time
+    
+    return pA, pB, total_time
 
 ''' Given an upstream circuit, decide which (if any) axis is golden
 '''
