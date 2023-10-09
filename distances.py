@@ -1,4 +1,5 @@
 import numpy as np
+from icecream import ic
 
 def totalVariationalDistance(p1, p2):
     # make sure distributions are normalized
@@ -80,3 +81,37 @@ def weighted_distance(p1, p2):
             total_distance += abs(p2[k])
 
     return total_distance
+
+def l2_norm_distance(p1, p2, expected_bits):
+    # make sure distributions are normalized
+    # (likely unnecessary but good practice)
+    sum = np.sum([p1[k] for k in p1.keys()])
+    for k in p1.keys():
+        p1[k] = p1[k]/sum
+
+    sum = np.sum([p2[k] for k in p2.keys()])
+    for k in p2.keys():
+        p2[k] = p2[k] / sum
+
+    p1_vec = np.zeros([2**expected_bits])
+    p2_vec = np.zeros([2**expected_bits])
+
+    for dec_num_1 in range(2**expected_bits):
+        # make sure we have all bitstrings in our counts
+        bin_num = format(dec_num_1, '03b')
+        if bin_num not in p1.keys():
+            p1_vec[dec_num_1] = 0
+        else:
+            p1_vec[dec_num_1] = p1[bin_num]
+    for dec_num_2 in range(2**expected_bits):
+        # make sure we have all bitstrings in our counts
+        bin_num = format(dec_num_2, '03b')
+        if bin_num not in p2.keys():
+            p2_vec[dec_num_2] = 0
+        else:
+            p2_vec[dec_num_2] = p2[bin_num]
+
+    diff = p1_vec - p2_vec
+    return np.linalg.norm(diff)
+
+    
